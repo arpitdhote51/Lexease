@@ -63,14 +63,14 @@ export default function LexeaseApp() {
     const fileType = file.type;
 
     try {
-        let text = '';
         if (fileType.startsWith('image/')) {
             const reader = new FileReader();
             reader.onload = (e) => {
                 setDocumentText(e.target?.result as string);
+                setIsLoading(false);
             };
             reader.readAsDataURL(file);
-            // No text for images, the data URI is set directly.
+            return;
         } else if (fileType === 'application/pdf') {
             const reader = new FileReader();
             reader.onload = async (e) => {
@@ -80,7 +80,7 @@ export default function LexeaseApp() {
                 for (let i = 1; i <= pdf.numPages; i++) {
                     const page = await pdf.getPage(i);
                     const textContent = await page.getTextContent();
-                    fullText += textContent.items.map(item => item.str).join(' ');
+                    fullText += textContent.items.map(item => (item as any).str).join(' ');
                 }
                 setDocumentText(fullText);
             };
@@ -116,12 +116,22 @@ export default function LexeaseApp() {
         });
         setFile(null);
     } finally {
-        setIsLoading(false);
+        // For non-image files, loading state is handled inside reader.onload
+        if (!file.type.startsWith('image/')) {
+          const reader = new FileReader();
+          reader.onload = () => setIsLoading(false);
+          reader.onerror = () => setIsLoading(false);
+          if (file.type === 'application/pdf' || file.name.endsWith('.docx')) {
+            reader.readAsArrayBuffer(file);
+          } else {
+            reader.readAsText(file);
+          }
+        }
     }
   };
 
   const handleAnalyze = async () => {
-    if (!documentText.trim() && !file?.type.startsWith('image/')) {
+    if (!documentText.trim()) {
       toast({
         variant: "destructive",
         title: "Error",
@@ -133,7 +143,7 @@ export default function LexeaseApp() {
     setIsLoading(true);
     setAnalysisResult(null);
 
-    const docText = file?.type.startsWith('image/') ? file.name : documentText;
+    const docText = documentText;
 
     try {
       const summarizationInput: PlainLanguageSummarizationInput = {
@@ -222,6 +232,7 @@ export default function LexeaseApp() {
                             onClick={() => {
                                 setFile(null);
                                 setDocumentText('');
+                                setAnalysisResult(null);
                             }}
                         >
                             <X className="mr-2 h-4 w-4" />

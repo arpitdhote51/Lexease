@@ -14,7 +14,7 @@ import {z} from 'genkit';
 const RiskFlaggingInputSchema = z.object({
   legalText: z
     .string()
-    .describe('The legal text to analyze for potentially risky clauses.'),
+    .describe('The legal text to analyze for potentially risky clauses, or a data URI for an image.'),
 });
 export type RiskFlaggingInput = z.infer<typeof RiskFlaggingInputSchema>;
 
@@ -37,10 +37,23 @@ const riskFlaggingPrompt = ai.definePrompt({
 
   Analyze the following legal text and identify any clauses that could be problematic, unusual, or create a potential risk for the user. Provide a list of the risky clauses.
 
-  Legal Text: {{{legalText}}}
+  Legal Text:
+  {{#if (isDataUri legalText)}}
+  {{media url=legalText}}
+  {{else}}
+  {{{legalText}}}
+  {{/if}}
 
   Return only a list of the potentially risky clauses.
   `,
+  customize: (prompt) => {
+    return {
+      ...prompt,
+      custom: {
+        isDataUri: (text: string) => text.startsWith('data:'),
+      },
+    };
+  },
 });
 
 const riskFlaggingFlow = ai.defineFlow(
