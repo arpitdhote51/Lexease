@@ -25,6 +25,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Scale, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const authSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -39,6 +40,7 @@ export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false);
   const { signIn, signUp } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
 
   const form = useForm<AuthFormValues>({
     resolver: zodResolver(authSchema),
@@ -64,7 +66,11 @@ export default function AuthPage() {
     setIsLoading(true);
     try {
       await signUp(data);
-      router.push("/");
+      form.reset();
+      toast({
+        title: "Verification Email Sent",
+        description: "Please check your inbox and verify your email address to sign in.",
+      })
     } catch (error) {
       // Error is handled in useAuth hook
     } finally {

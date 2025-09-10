@@ -12,6 +12,7 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendEmailVerification,
   signOut as firebaseSignOut,
 } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
@@ -44,13 +45,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (data: AuthFormValues) => {
     try {
-      await signInWithEmailAndPassword(auth, data.email, data.password);
+      const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
+      if (!userCredential.user.emailVerified) {
+        await firebaseSignOut(auth);
+        toast({
+            variant: "destructive",
+            title: "Email not verified",
+            description: "Please verify your email address before signing in.",
+        });
+        throw new Error("Email not verified");
+      }
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Sign in failed",
-        description: error.message,
-      });
+       if (error.message !== "Email not verified") {
+            toast({
+                variant: "destructive",
+                title: "Sign in failed",
+                description: error.message,
+            });
+       }
       throw error;
     }
   };
@@ -63,6 +75,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data.password
       );
       const newUser = userCredential.user;
+      await sendEmailVerification(newUser);
+      await firebaseSignOut(auth); // Sign out user until they are verified
+      
       // Add user to Firestore
       await setDoc(doc(db, "users", newUser.uid), {
         email: newUser.email,
