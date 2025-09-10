@@ -75,14 +75,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data.password
       );
       const newUser = userCredential.user;
-      await sendEmailVerification(newUser);
-      await firebaseSignOut(auth); // Sign out user until they are verified
       
-      // Add user to Firestore
-      await setDoc(doc(db, "users", newUser.uid), {
+      // Don't await these promises on the client
+      sendEmailVerification(newUser);
+      setDoc(doc(db, "users", newUser.uid), {
         email: newUser.email,
         createdAt: new Date(),
       });
+
+      await firebaseSignOut(auth); // Sign out user until they are verified
     } catch (error: any) {
       toast({
         variant: "destructive",

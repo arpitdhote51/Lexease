@@ -70,7 +70,7 @@ export default function AuthPage() {
       toast({
         title: "Verification Email Sent",
         description: "Please check your inbox and verify your email address to sign in.",
-      })
+      });
     } catch (error) {
       // Error is handled in useAuth hook
     } finally {
