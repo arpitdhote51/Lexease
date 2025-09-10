@@ -38,7 +38,8 @@ export type AuthFormValues = z.infer<typeof authSchema>;
 
 export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false);
-  const { signIn, signUp } = useAuth();
+  const [showResend, setShowResend] = useState(false);
+  const { signIn, signUp, sendPasswordReset, resendVerificationEmail } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -52,11 +53,14 @@ export default function AuthPage() {
 
   const handleSignIn = async (data: AuthFormValues) => {
     setIsLoading(true);
+    setShowResend(false);
     try {
       await signIn(data);
       router.push("/");
-    } catch (error) {
-      // Error is handled in useAuth hook
+    } catch (error: any) {
+      if (error.code === "auth/user-not-verified") {
+        setShowResend(true);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -77,6 +81,28 @@ export default function AuthPage() {
       setIsLoading(false);
     }
   };
+
+  const handlePasswordReset = async () => {
+    const email = form.getValues("email");
+    if (!email) {
+        form.trigger("email");
+        return;
+    }
+    setIsLoading(true);
+    await sendPasswordReset(email);
+    setIsLoading(false);
+  }
+
+  const handleResendVerification = async () => {
+    const email = form.getValues("email");
+    if (!email) {
+        form.trigger("email");
+        return;
+    }
+    setIsLoading(true);
+    await resendVerificationEmail(email, form.getValues("password"));
+    setIsLoading(false);
+  }
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
@@ -140,10 +166,38 @@ export default function AuthPage() {
                               disabled={isLoading}
                             />
                           </FormControl>
+                           <div className="text-right">
+                                <Button
+                                type="button"
+                                variant="link"
+                                className="h-auto p-0 text-sm text-muted-foreground"
+                                onClick={handlePasswordReset}
+                                disabled={isLoading}
+                                >
+                                Forgot Password?
+                                </Button>
+                            </div>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+
+                    {showResend && (
+                        <div className="flex flex-col items-center space-y-2">
+                             <p className="text-sm text-center text-destructive">Your email is not verified.</p>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full"
+                                onClick={handleResendVerification}
+                                disabled={isLoading}
+                            >
+                                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Resend Verification Email
+                            </Button>
+                        </div>
+                    )}
+                   
                     <Button type="submit" className="w-full" disabled={isLoading}>
                       {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Sign In

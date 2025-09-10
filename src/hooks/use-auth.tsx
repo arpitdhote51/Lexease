@@ -14,6 +14,7 @@ import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
   signOut as firebaseSignOut,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { doc, setDoc } from "firebase/firestore";
@@ -26,6 +27,8 @@ interface AuthContextType {
   signIn: (data: AuthFormValues) => Promise<void>;
   signUp: (data: AuthFormValues) => Promise<void>;
   signOut: () => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>;
+  resendVerificationEmail: (email: string, password: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -51,12 +54,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         toast({
             variant: "destructive",
             title: "Email not verified",
-            description: "Please verify your email address before signing in.",
+            description: "Please check your inbox or resend the verification email.",
         });
-        throw new Error("Email not verified");
+        const error: any = new Error("Email not verified");
+        error.code = "auth/user-not-verified";
+        throw error;
       }
     } catch (error: any) {
-       if (error.message !== "Email not verified") {
+       if (error.code !== "auth/user-not-verified") {
             toast({
                 variant: "destructive",
                 title: "Sign in failed",
@@ -106,12 +111,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const sendPasswordReset = async (email: string) => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast({
+        title: "Password Reset Email Sent",
+        description: "Check your inbox to reset your password.",
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Password Reset Failed",
+        description: error.message,
+      });
+    }
+  };
+  
+  const resendVerificationEmail = async (email: string, password: string) => {
+    try {
+      // To resend, we need to temporarily sign the user in
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      await sendEmailVerification(userCredential.user);
+      await firebaseSignOut(auth);
+      toast({
+        title: "Verification Email Sent",
+        description: "Please check your inbox and verify your email address.",
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Failed to Resend Email",
+        description: "Could not resend verification email. Please check your credentials.",
+      });
+    }
+  };
+
   const value = {
     user,
     loading,
     signIn,
     signUp,
     signOut,
+    sendPasswordReset,
+    resendVerificationEmail
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
