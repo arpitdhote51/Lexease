@@ -13,7 +13,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const KeyEntityRecognitionInputSchema = z.object({
-  documentText: z.string().describe('The text content of the legal document, or a data URI for an image.'),
+  documentText: z.string().describe('The text content of the legal document.'),
 });
 export type KeyEntityRecognitionInput = z.infer<typeof KeyEntityRecognitionInputSchema>;
 
@@ -40,22 +40,10 @@ const keyEntityRecognitionPrompt = ai.definePrompt({
   The entities should include parties involved, dates, locations, and other relevant information.
 
   Document:
-  {{#if (isDataUri documentText)}}
-  {{media url=documentText}}
-  {{else}}
   {{{documentText}}}
-  {{/if}}
 
   Please provide the output in JSON format as defined by the KeyEntityRecognitionOutputSchema.
 `,
-  customize: (prompt) => {
-    return {
-      ...prompt,
-      custom: {
-        isDataUri: (text: string) => text.startsWith('data:'),
-      },
-    };
-  },
 });
 
 const keyEntityRecognitionFlow = ai.defineFlow(

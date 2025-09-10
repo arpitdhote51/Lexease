@@ -63,15 +63,7 @@ export default function LexeaseApp() {
     const fileType = file.type;
 
     try {
-        if (fileType.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                setDocumentText(e.target?.result as string);
-                setIsLoading(false);
-            };
-            reader.readAsDataURL(file);
-            return;
-        } else if (fileType === 'application/pdf') {
+        if (fileType === 'application/pdf') {
             const reader = new FileReader();
             reader.onload = async (e) => {
                 const typedArray = new Uint8Array(e.target?.result as ArrayBuffer);
@@ -103,7 +95,7 @@ export default function LexeaseApp() {
             toast({
                 variant: 'destructive',
                 title: 'Unsupported File Type',
-                description: 'Please upload a PDF, DOCX, TXT, or image file.',
+                description: 'Please upload a PDF, DOCX, or TXT file.',
             });
             setFile(null);
         }
@@ -116,16 +108,15 @@ export default function LexeaseApp() {
         });
         setFile(null);
     } finally {
-        // For non-image files, loading state is handled inside reader.onload
-        if (!file.type.startsWith('image/')) {
-          const reader = new FileReader();
-          reader.onload = () => setIsLoading(false);
-          reader.onerror = () => setIsLoading(false);
-          if (file.type === 'application/pdf' || file.name.endsWith('.docx')) {
+        const reader = new FileReader();
+        reader.onloadend = () => setIsLoading(false);
+        reader.onerror = () => setIsLoading(false);
+        if (file.type === 'application/pdf' || file.name.endsWith('.docx')) {
             reader.readAsArrayBuffer(file);
-          } else {
+        } else if (file.type === 'text/plain') {
             reader.readAsText(file);
-          }
+        } else {
+            setIsLoading(false);
         }
     }
   };
@@ -135,7 +126,7 @@ export default function LexeaseApp() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Please upload a file to analyze.",
+        description: "Please upload and process a file to analyze.",
       });
       return;
     }
@@ -143,15 +134,13 @@ export default function LexeaseApp() {
     setIsLoading(true);
     setAnalysisResult(null);
 
-    const docText = documentText;
-
     try {
       const summarizationInput: PlainLanguageSummarizationInput = {
-        legalDocumentText: docText,
+        legalDocumentText: documentText,
         userRole,
       };
-      const entityInput: KeyEntityRecognitionInput = { documentText: docText };
-      const riskInput: RiskFlaggingInput = { legalText: docText };
+      const entityInput: KeyEntityRecognitionInput = { documentText: documentText };
+      const riskInput: RiskFlaggingInput = { legalText: documentText };
 
       const [summary, entities, risks] = await Promise.all([
         plainLanguageSummarization(summarizationInput),
@@ -218,7 +207,7 @@ export default function LexeaseApp() {
                     type="file"
                     className="sr-only"
                     onChange={handleFileChange}
-                    accept=".pdf,.docx,.txt,image/*"
+                    accept=".pdf,.docx,.txt"
                     disabled={isLoading}
                 />
                 {file ? (
@@ -246,7 +235,7 @@ export default function LexeaseApp() {
                             Drag & drop or click to upload
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                            PDF, DOCX, TXT, or Image
+                            PDF, DOCX, or TXT
                         </p>
                     </label>
                 )}

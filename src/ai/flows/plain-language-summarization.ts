@@ -12,7 +12,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const PlainLanguageSummarizationInputSchema = z.object({
-  legalDocumentText: z.string().describe('The text of the legal document to summarize, or a data URI for an image.'),
+  legalDocumentText: z.string().describe('The text of the legal document to summarize.'),
   userRole: z
     .enum(['lawyer', 'lawStudent', 'layperson'])
     .describe(
@@ -47,21 +47,9 @@ const prompt = ai.definePrompt({
 
   User Role: {{{userRole}}}
   Legal Document:
-  {{#if (isDataUri legalDocumentText)}}
-  {{media url=legalDocumentText}}
-  {{else}}
   {{{legalDocumentText}}}
-  {{/if}}
 
   Summary:`,
-  customize: (prompt) => {
-    return {
-      ...prompt,
-      custom: {
-        isDataUri: (text: string) => text.startsWith('data:'),
-      },
-    };
-  },
 });
 
 const plainLanguageSummarizationFlow = ai.defineFlow(
