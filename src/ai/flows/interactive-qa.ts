@@ -13,7 +13,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const InteractiveQAInputSchema = z.object({
-  documentText: z.string().describe('The text content of the legal document.'),
+  documentText: z.string().describe('The text content of the legal document, or a data URI for an image.'),
   question: z.string().describe('The user question about the document.'),
 });
 export type InteractiveQAInput = z.infer<typeof InteractiveQAInputSchema>;
@@ -35,13 +35,25 @@ const prompt = ai.definePrompt({
   Based on the content of the following legal document, answer the user's question.
 
   Legal Document:
+  {{#if (isDataUri documentText)}}
+  {{media url=documentText}}
+  {{else}}
   {{documentText}}
+  {{/if}}
 
   Question:
   {{question}}
 
   Answer:
   `,
+  customize: (prompt) => {
+    return {
+      ...prompt,
+      custom: {
+        isDataUri: (text: string) => text.startsWith('data:'),
+      },
+    };
+  },
 });
 
 const interactiveQAFlow = ai.defineFlow(

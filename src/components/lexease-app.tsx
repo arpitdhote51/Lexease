@@ -1,13 +1,14 @@
 "use client";
-import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { useState, useCallback } from "react";
+import { Loader2, FileUp, File, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import * as pdfjs from 'pdfjs-dist';
+import mammoth from 'mammoth';
 
 import {
   plainLanguageSummarization,
@@ -31,6 +32,8 @@ import RisksDisplay from "./risks-display";
 import QAChat from "./qa-chat";
 import { Skeleton } from "./ui/skeleton";
 
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
 type UserRole = "layperson" | "lawStudent" | "lawyer";
 
 export default function LexeaseApp() {
@@ -42,15 +45,87 @@ export default function LexeaseApp() {
     entities: KeyEntityRecognitionOutput;
     risks: RiskFlaggingOutput;
   } | null>(null);
+  const [file, setFile] = useState<File | null>(null);
 
   const { toast } = useToast();
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+        setFile(selectedFile);
+        processFile(selectedFile);
+    }
+  };
+
+  const processFile = async (file: File) => {
+    setIsLoading(true);
+    setDocumentText('');
+    const fileType = file.type;
+
+    try {
+        let text = '';
+        if (fileType.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                setDocumentText(e.target?.result as string);
+            };
+            reader.readAsDataURL(file);
+            // No text for images, the data URI is set directly.
+        } else if (fileType === 'application/pdf') {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const typedArray = new Uint8Array(e.target?.result as ArrayBuffer);
+                const pdf = await pdfjs.getDocument(typedArray).promise;
+                let fullText = '';
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    fullText += textContent.items.map(item => item.str).join(' ');
+                }
+                setDocumentText(fullText);
+            };
+            reader.readAsArrayBuffer(file);
+        } else if (file.name.endsWith('.docx')) {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const arrayBuffer = e.target?.result as ArrayBuffer;
+                const result = await mammoth.extractRawText({ arrayBuffer });
+                setDocumentText(result.value);
+            };
+            reader.readAsArrayBuffer(file);
+        } else if (fileType === 'text/plain') {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                setDocumentText(e.target?.result as string);
+            };
+            reader.readAsText(file);
+        } else {
+            toast({
+                variant: 'destructive',
+                title: 'Unsupported File Type',
+                description: 'Please upload a PDF, DOCX, TXT, or image file.',
+            });
+            setFile(null);
+        }
+    } catch (error) {
+        console.error('File processing error:', error);
+        toast({
+            variant: 'destructive',
+            title: 'File Error',
+            description: 'There was an error processing your file.',
+        });
+        setFile(null);
+    } finally {
+        setIsLoading(false);
+    }
+  };
+
   const handleAnalyze = async () => {
-    if (!documentText.trim()) {
+    if (!documentText.trim() && !file?.type.startsWith('image/')) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Please enter some legal text to analyze.",
+        description: "Please upload a file to analyze.",
       });
       return;
     }
@@ -58,13 +133,15 @@ export default function LexeaseApp() {
     setIsLoading(true);
     setAnalysisResult(null);
 
+    const docText = file?.type.startsWith('image/') ? file.name : documentText;
+
     try {
       const summarizationInput: PlainLanguageSummarizationInput = {
-        legalDocumentText: documentText,
+        legalDocumentText: docText,
         userRole,
       };
-      const entityInput: KeyEntityRecognitionInput = { documentText };
-      const riskInput: RiskFlaggingInput = { legalText: documentText };
+      const entityInput: KeyEntityRecognitionInput = { documentText: docText };
+      const riskInput: RiskFlaggingInput = { legalText: docText };
 
       const [summary, entities, risks] = await Promise.all([
         plainLanguageSummarization(summarizationInput),
@@ -94,6 +171,20 @@ export default function LexeaseApp() {
       <Skeleton className="h-20 w-full" />
     </div>
   );
+  
+  const onDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const files = event.dataTransfer.files;
+    if (files && files.length > 0) {
+      setFile(files[0]);
+      processFile(files[0]);
+    }
+  }, []);
+
+  const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+  }, []);
+
 
   return (
     <div className="container mx-auto p-4 md:p-8">
@@ -103,21 +194,53 @@ export default function LexeaseApp() {
             <CardHeader>
               <CardTitle className="font-headline">Document Input</CardTitle>
               <CardDescription>
-                Paste your legal document below and select your role to begin.
+                Upload your legal document below and select your role to begin.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="document-text">Legal Document Text</Label>
-                <Textarea
-                  id="document-text"
-                  placeholder="Paste your legal document here..."
-                  className="min-h-[300px] font-body"
-                  value={documentText}
-                  onChange={(e) => setDocumentText(e.target.value)}
-                  disabled={isLoading}
+               <div
+                className="relative flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-lg cursor-pointer bg-muted hover:bg-muted/50"
+                onDrop={onDrop}
+                onDragOver={onDragOver}
+                >
+                <input
+                    id="file-upload"
+                    type="file"
+                    className="sr-only"
+                    onChange={handleFileChange}
+                    accept=".pdf,.docx,.txt,image/*"
+                    disabled={isLoading}
                 />
-              </div>
+                {file ? (
+                    <div className="text-center">
+                        <File className="mx-auto h-12 w-12 text-muted-foreground" />
+                        <p className="mt-2 font-semibold">{file.name}</p>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="mt-2"
+                            onClick={() => {
+                                setFile(null);
+                                setDocumentText('');
+                            }}
+                        >
+                            <X className="mr-2 h-4 w-4" />
+                            Remove
+                        </Button>
+                    </div>
+                ) : (
+                    <label htmlFor="file-upload" className="w-full h-full flex flex-col items-center justify-center cursor-pointer text-center">
+                        <FileUp className="h-12 w-12 text-muted-foreground" />
+                        <p className="mt-4 text-sm font-semibold">
+                            Drag & drop or click to upload
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            PDF, DOCX, TXT, or Image
+                        </p>
+                    </label>
+                )}
+                </div>
+
               <div className="space-y-4">
                 <Label>Select Your Role</Label>
                 <RadioGroup
@@ -141,7 +264,7 @@ export default function LexeaseApp() {
                   </div>
                 </RadioGroup>
               </div>
-              <Button onClick={handleAnalyze} disabled={isLoading} className="w-full">
+              <Button onClick={handleAnalyze} disabled={isLoading || !file} className="w-full">
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -163,7 +286,7 @@ export default function LexeaseApp() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoading ? <AnalysisPlaceholder /> :
+              {isLoading && !analysisResult ? <AnalysisPlaceholder /> :
                 !analysisResult ? (
                   <div className="text-center text-muted-foreground py-16">
                     <p>Your analysis results will appear here.</p>
@@ -174,7 +297,7 @@ export default function LexeaseApp() {
                     <TabsTrigger value="summary">Summary</TabsTrigger>
                     <TabsTrigger value="entities">Key Entities</TabsTrigger>
                     <TabsTrigger value="risks">Risk Flags</TabsTrigger>
-                    <TabsTrigger value="qa">Q&amp;A</TabsTrigger>
+                    <TabsTrigger value="qa">Q&A</TabsTrigger>
                   </TabsList>
                   <TabsContent value="summary">
                     <SummaryDisplay summary={analysisResult.summary.plainLanguageSummary} />
