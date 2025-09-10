@@ -1,6 +1,6 @@
 "use client";
-import { useState, useCallback } from "react";
-import { Loader2, FileUp, File, X } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { Loader2, FileUp, File, X, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 import mammoth from 'mammoth';
+import { db } from "@/lib/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { useAuth } from "@/hooks/use-auth";
 
 import {
   plainLanguageSummarization,
@@ -31,12 +34,20 @@ import EntitiesDisplay from "./entities-display";
 import RisksDisplay from "./risks-display";
 import QAChat from "./qa-chat";
 import { Skeleton } from "./ui/skeleton";
+import type { DocumentData } from "./dashboard";
+
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 type UserRole = "layperson" | "lawStudent" | "lawyer";
 
-export default function LexeaseApp() {
+interface LexeaseAppProps {
+    onAnalysisComplete: () => void;
+    existingDocument: DocumentData | null;
+}
+
+export default function LexeaseApp({ onAnalysisComplete, existingDocument }: LexeaseAppProps) {
+  const { user } = useAuth();
   const [documentText, setDocumentText] = useState("");
   const [userRole, setUserRole] = useState<UserRole>("layperson");
   const [isLoading, setIsLoading] = useState(false);
@@ -48,6 +59,15 @@ export default function LexeaseApp() {
   const [file, setFile] = useState<File | null>(null);
 
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (existingDocument) {
+      setDocumentText(existingDocument.documentText);
+      setAnalysisResult(existingDocument.analysis);
+      setFile(new File([], existingDocument.fileName));
+    }
+  }, [existingDocument]);
+
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -148,7 +168,19 @@ export default function LexeaseApp() {
         riskFlagging(riskInput),
       ]);
       
-      setAnalysisResult({ summary, entities, risks });
+      const results = { summary, entities, risks };
+      setAnalysisResult(results);
+
+      if (user && file) {
+          await addDoc(collection(db, 'documents'), {
+              userId: user.uid,
+              fileName: file.name,
+              documentText,
+              analysis: results,
+              createdAt: serverTimestamp()
+          });
+      }
+
 
     } catch (error) {
       console.error("Analysis failed:", error);
@@ -173,12 +205,13 @@ export default function LexeaseApp() {
   
   const onDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
+    if(existingDocument) return;
     const files = event.dataTransfer.files;
     if (files && files.length > 0) {
       setFile(files[0]);
       processFile(files[0]);
     }
-  }, []);
+  }, [existingDocument]);
 
   const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -187,18 +220,22 @@ export default function LexeaseApp() {
 
   return (
     <div className="container mx-auto p-4 md:p-8">
+        <Button variant="ghost" onClick={onAnalysisComplete} className="mb-4">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Dashboard
+        </Button>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-5">
           <Card className="sticky top-8">
             <CardHeader>
               <CardTitle className="font-headline">Document Input</CardTitle>
               <CardDescription>
-                Upload your legal document below and select your role to begin.
+                {existingDocument ? "Viewing analysis for a saved document." : "Upload a new document for analysis."}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
                <div
-                className="relative flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-lg cursor-pointer bg-muted hover:bg-muted/50"
+                className={`relative flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-lg  bg-muted  ${!existingDocument ? 'cursor-pointer hover:bg-muted/50' : 'cursor-not-allowed'}`}
                 onDrop={onDrop}
                 onDragOver={onDragOver}
                 >
@@ -208,28 +245,30 @@ export default function LexeaseApp() {
                     className="sr-only"
                     onChange={handleFileChange}
                     accept=".pdf,.docx,.txt"
-                    disabled={isLoading}
+                    disabled={isLoading || !!existingDocument}
                 />
                 {file ? (
-                    <div className="text-center">
+                    <div className="text-center p-4">
                         <File className="mx-auto h-12 w-12 text-muted-foreground" />
-                        <p className="mt-2 font-semibold">{file.name}</p>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="mt-2"
-                            onClick={() => {
-                                setFile(null);
-                                setDocumentText('');
-                                setAnalysisResult(null);
-                            }}
-                        >
-                            <X className="mr-2 h-4 w-4" />
-                            Remove
-                        </Button>
+                        <p className="mt-2 font-semibold truncate">{file.name}</p>
+                         {!existingDocument && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="mt-2"
+                                onClick={() => {
+                                    setFile(null);
+                                    setDocumentText('');
+                                    setAnalysisResult(null);
+                                }}
+                            >
+                                <X className="mr-2 h-4 w-4" />
+                                Remove
+                            </Button>
+                        )}
                     </div>
                 ) : (
-                    <label htmlFor="file-upload" className="w-full h-full flex flex-col items-center justify-center cursor-pointer text-center">
+                    <label htmlFor="file-upload" className={`w-full h-full flex flex-col items-center justify-center text-center ${!existingDocument ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
                         <FileUp className="h-12 w-12 text-muted-foreground" />
                         <p className="mt-4 text-sm font-semibold">
                             Drag & drop or click to upload
@@ -248,7 +287,7 @@ export default function LexeaseApp() {
                   className="flex flex-col sm:flex-row gap-4"
                   value={userRole}
                   onValueChange={(value: UserRole) => setUserRole(value)}
-                  disabled={isLoading}
+                  disabled={isLoading || !!existingDocument}
                 >
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="layperson" id="r1" />
@@ -264,8 +303,8 @@ export default function LexeaseApp() {
                   </div>
                 </RadioGroup>
               </div>
-              <Button onClick={handleAnalyze} disabled={isLoading || !file} className="w-full">
-                {isLoading ? (
+              <Button onClick={handleAnalyze} disabled={isLoading || !file || !!analysisResult} className="w-full">
+                {isLoading && !analysisResult ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Analyzing...
@@ -289,7 +328,7 @@ export default function LexeaseApp() {
               {isLoading && !analysisResult ? <AnalysisPlaceholder /> :
                 !analysisResult ? (
                   <div className="text-center text-muted-foreground py-16">
-                    <p>Your analysis results will appear here.</p>
+                    <p>Your analysis results will appear here once you upload and analyze a document.</p>
                   </div>
                 ) : (
                 <Tabs defaultValue="summary" className="w-full">

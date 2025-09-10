@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import Header from '@/components/layout/header';
-import LexeaseApp from '@/components/lexease-app';
+import Dashboard from '@/components/dashboard';
 import { Loader2 } from 'lucide-react';
 
 export default function Home() {
@@ -29,7 +29,7 @@ export default function Home() {
     <div className="flex flex-col min-h-screen bg-background">
       <Header />
       <main className="flex-1">
-        <LexeaseApp />
+        <Dashboard />
       </main>
     </div>
   );
