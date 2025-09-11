@@ -64,13 +64,11 @@ export default function QAChat({ documentText, documentId }: QAChatProps) {
 
     const userMessage: Message = { role: "user", content: input };
     
-    // Optimistically update UI
     setMessages((prev) => [...prev, userMessage]); 
     setInput("");
     setIsLoading(true);
 
     try {
-        // Save user message to Firestore
         const messagesCol = collection(db, "documents", documentId, "messages");
         await addDoc(messagesCol, {
             ...userMessage,
@@ -84,12 +82,10 @@ export default function QAChat({ documentText, documentId }: QAChatProps) {
         const result = await interactiveQA(qaInput);
         const assistantMessage: Message = { role: "assistant", content: result.answer };
 
-        // Save assistant message to Firestore
         await addDoc(messagesCol, {
             ...assistantMessage,
             timestamp: serverTimestamp(),
         });
-        // The onSnapshot listener will update the state with the new messages
 
     } catch (error) {
         console.error("Q&A failed:", error);
@@ -98,7 +94,6 @@ export default function QAChat({ documentText, documentId }: QAChatProps) {
             title: "Error",
             description: "Could not get an answer. Please try again."
         });
-        // On error, remove the optimistic user message. Firestore won't have it.
         setMessages(prev => prev.filter(msg => msg !== userMessage));
     } finally {
         setIsLoading(false);
@@ -106,9 +101,9 @@ export default function QAChat({ documentText, documentId }: QAChatProps) {
   };
 
   return (
-    <Card className="h-full flex flex-col">
+    <Card className="h-[70vh] flex flex-col mt-4 bg-white border-border shadow-none">
       <CardHeader>
-        <CardTitle className="font-headline text-lg">Interactive Q&A</CardTitle>
+        <CardTitle className="font-bold text-lg text-foreground">Interactive Q&A</CardTitle>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col gap-4">
         <ScrollArea className="flex-1 pr-4 -mr-4" ref={scrollAreaRef}>
@@ -121,21 +116,21 @@ export default function QAChat({ documentText, documentId }: QAChatProps) {
                 }`}
               >
                 {message.role === "assistant" && (
-                  <Avatar className="h-8 w-8">
+                  <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
                     <AvatarFallback><Bot size={20} /></AvatarFallback>
                   </Avatar>
                 )}
                 <div
-                  className={`rounded-lg p-3 max-w-sm text-sm ${
+                  className={`rounded-lg p-3 max-w-lg text-sm ${
                     message.role === "user"
                       ? "bg-primary text-primary-foreground"
-                      : "bg-muted"
+                      : "bg-background"
                   }`}
                 >
                   <p className="whitespace-pre-wrap font-body leading-relaxed">{message.content}</p>
                 </div>
                  {message.role === "user" && (
-                  <Avatar className="h-8 w-8">
+                  <Avatar className="h-8 w-8 bg-muted">
                     <AvatarFallback><User size={20} /></AvatarFallback>
                   </Avatar>
                 )}
@@ -143,10 +138,10 @@ export default function QAChat({ documentText, documentId }: QAChatProps) {
             ))}
             {isLoading && (
                  <div className="flex items-start gap-3">
-                    <Avatar className="h-8 w-8">
+                    <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
                         <AvatarFallback><Bot size={20} /></AvatarFallback>
                     </Avatar>
-                    <div className="rounded-lg p-3 max-w-sm bg-muted flex items-center space-x-2">
+                    <div className="rounded-lg p-3 max-w-sm bg-background flex items-center space-x-2">
                         <span className="h-2 w-2 bg-foreground/50 rounded-full animate-pulse [animation-delay:-0.3s]"></span>
                         <span className="h-2 w-2 bg-foreground/50 rounded-full animate-pulse [animation-delay:-0.15s]"></span>
                         <span className="h-2 w-2 bg-foreground/50 rounded-full animate-pulse"></span>
@@ -161,8 +156,9 @@ export default function QAChat({ documentText, documentId }: QAChatProps) {
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask a question about the document..."
             disabled={isLoading || !documentText}
+            className="text-base"
           />
-          <Button type="submit" disabled={isLoading || !input.trim()} size="icon">
+          <Button type="submit" disabled={isLoading || !input.trim()} className="bg-accent hover:bg-accent/90">
             <Send className="h-4 w-4" />
           </Button>
         </form>

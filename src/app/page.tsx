@@ -24,7 +24,7 @@ export default function Home() {
   if (initialLoad) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
   }

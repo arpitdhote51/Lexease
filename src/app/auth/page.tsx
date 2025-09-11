@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Scale, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const authSchema = z.object({
@@ -105,11 +105,10 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+    <div className="flex min-h-screen flex-col items-center justify-center p-4">
       <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[400px]">
         <div className="flex flex-col space-y-2 text-center">
-            <Scale className="mx-auto h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold font-headline text-foreground">
+            <h1 className="text-3xl font-bold text-primary">
                 Welcome to LexEase
             </h1>
             <p className="text-muted-foreground">
@@ -117,14 +116,14 @@ export default function AuthPage() {
             </p>
         </div>
         <Tabs defaultValue="signin" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-2 bg-background">
             <TabsTrigger value="signin">Sign In</TabsTrigger>
             <TabsTrigger value="signup">Sign Up</TabsTrigger>
           </TabsList>
           <TabsContent value="signin">
-            <Card>
+            <Card className="bg-white shadow-lg border-border">
               <CardHeader>
-                <CardTitle>Sign In</CardTitle>
+                <CardTitle className="text-foreground">Sign In</CardTitle>
                 <CardDescription>
                   Enter your credentials to access your account.
                 </CardDescription>
@@ -140,12 +139,13 @@ export default function AuthPage() {
                       name="email"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Email</FormLabel>
+                          <FormLabel className="text-foreground">Email</FormLabel>
                           <FormControl>
                             <Input
                               placeholder="name@example.com"
                               {...field}
                               disabled={isLoading}
+                              className="text-base"
                             />
                           </FormControl>
                           <FormMessage />
@@ -157,20 +157,21 @@ export default function AuthPage() {
                       name="password"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Password</FormLabel>
+                          <FormLabel className="text-foreground">Password</FormLabel>
                           <FormControl>
                             <Input
                               type="password"
                               placeholder="••••••••"
                               {...field}
                               disabled={isLoading}
+                              className="text-base"
                             />
                           </FormControl>
                            <div className="text-right">
                                 <Button
                                 type="button"
                                 variant="link"
-                                className="h-auto p-0 text-sm text-muted-foreground"
+                                className="h-auto p-0 text-sm text-accent"
                                 onClick={handlePasswordReset}
                                 disabled={isLoading}
                                 >
@@ -198,7 +199,7 @@ export default function AuthPage() {
                         </div>
                     )}
                    
-                    <Button type="submit" className="w-full" disabled={isLoading}>
+                    <Button type="submit" className="w-full bg-accent text-white font-semibold py-3 rounded-lg hover:bg-accent/90" disabled={isLoading}>
                       {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Sign In
                     </Button>
@@ -208,9 +209,9 @@ export default function AuthPage() {
             </Card>
           </TabsContent>
           <TabsContent value="signup">
-            <Card>
+            <Card className="bg-white shadow-lg border-border">
               <CardHeader>
-                <CardTitle>Sign Up</CardTitle>
+                <CardTitle className="text-foreground">Sign Up</CardTitle>
                 <CardDescription>
                   Create a new account to get started.
                 </CardDescription>
@@ -226,12 +227,13 @@ export default function AuthPage() {
                       name="email"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Email</FormLabel>
+                          <FormLabel className="text-foreground">Email</FormLabel>
                           <FormControl>
                             <Input
                               placeholder="name@example.com"
                               {...field}
                               disabled={isLoading}
+                              className="text-base"
                             />
                           </FormControl>
                           <FormMessage />
@@ -243,20 +245,21 @@ export default function AuthPage() {
                       name="password"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Password</FormLabel>
+                          <FormLabel className="text-foreground">Password</FormLabel>
                           <FormControl>
                             <Input
                               type="password"
                               placeholder="••••••••"
                               {...field}
                               disabled={isLoading}
+                              className="text-base"
                             />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                    <Button type="submit" className="w-full" disabled={isLoading}>
+                    <Button type="submit" className="w-full bg-accent text-white font-semibold py-3 rounded-lg hover:bg-accent/90" disabled={isLoading}>
                       {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Sign Up
                     </Button>

@@ -42,9 +42,9 @@ export default function EntitiesDisplay({ entities }: EntitiesDisplayProps) {
 
   if (!entities || entities.length === 0) {
     return (
-        <Card>
+        <Card className="mt-4 bg-white border-border shadow-none">
             <CardHeader>
-                <CardTitle className="font-headline text-lg">Key Entities</CardTitle>
+                <CardTitle className="font-bold text-lg text-foreground">Key Entities</CardTitle>
             </CardHeader>
             <CardContent>
                 <p className="text-muted-foreground">No key entities were identified in the document.</p>
@@ -54,22 +54,22 @@ export default function EntitiesDisplay({ entities }: EntitiesDisplayProps) {
   }
 
   return (
-    <Card>
+    <Card className="mt-4 bg-white border-border shadow-none">
       <CardHeader>
-        <CardTitle className="font-headline text-lg">Key Entities</CardTitle>
+        <CardTitle className="font-bold text-lg text-foreground">Key Entities</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {Object.entries(groupedEntities).map(([type, values]) => {
           const Icon = getIconForType(type);
           return (
             <div key={type} className="space-y-2">
-              <h3 className="flex items-center gap-2 text-md font-semibold font-headline">
+              <h3 className="flex items-center gap-2 text-md font-semibold text-foreground">
                 <Icon className="h-5 w-5 text-primary" />
                 {type}
               </h3>
               <div className="flex flex-wrap gap-2">
                 {values.map((value, index) => (
-                    <Badge key={index} variant="secondary" className="font-normal font-body text-sm">
+                    <Badge key={index} variant="secondary" className="font-normal font-body text-sm bg-background border-border text-foreground">
                         {value}
                     </Badge>
                 ))}

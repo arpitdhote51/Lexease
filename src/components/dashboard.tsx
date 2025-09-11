@@ -6,22 +6,62 @@ import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card";
-import { FileText, Loader2, PlusCircle } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { Loader2, PlusCircle, FileText, CheckCircle, AlertTriangle } from "lucide-react";
+import { format } from "date-fns";
 import { useRouter } from "next/navigation";
-import Header from "./layout/header";
+import LexeaseLayout from "./layout/lexease-layout";
 
 export type DocumentData = {
   id: string;
   fileName: string;
   createdAt: any;
   documentText: string;
-  analysis: {
+  analysis?: {
     summary: { plainLanguageSummary: string };
     entities: { entities: { type: string; value: string }[] };
     risks: { riskyClauses: string[] };
   };
 };
+
+function DocumentCard({ doc, onSelect }: { doc: DocumentData, onSelect: (doc: DocumentData) => void }) {
+  const analysisComplete = !!doc.analysis;
+  return (
+    <div 
+        onClick={() => onSelect(doc)}
+        className="bg-white p-5 rounded-xl border border-border transition-all duration-300 hover:shadow-lg hover:-translate-y-1 cursor-pointer">
+      <div className="flex items-center gap-4 mb-4">
+        <div className="p-3 bg-background rounded-lg">
+          <span className="material-symbols-outlined text-primary">description</span>
+        </div>
+        <div>
+          <h3 className="font-semibold text-foreground truncate">{doc.fileName}</h3>
+          <p className="text-sm text-muted-foreground">
+            Uploaded on {doc.createdAt?.toDate ? format(doc.createdAt.toDate(), "yyyy-MM-dd") : 'N/A'}
+          </p>
+        </div>
+      </div>
+      <div className="h-2 bg-background rounded-full mb-3">
+        <div className={`h-2 ${analysisComplete ? 'bg-accent' : 'bg-yellow-400'} rounded-full`} style={{ width: analysisComplete ? '100%' : '60%' }}></div>
+      </div>
+      <p className="text-xs text-center text-muted-foreground">{analysisComplete ? 'Analysis Complete' : 'Analysis in Progress...'}</p>
+    </div>
+  );
+}
+
+function UploadNewCard({ onClick }: { onClick: () => void }) {
+  return (
+    <div
+      onClick={onClick}
+      className="flex items-center justify-center bg-transparent border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:bg-white hover:border-accent hover:text-accent transition-colors cursor-pointer min-h-[140px]"
+    >
+      <div className="text-center">
+        <span className="material-symbols-outlined text-4xl">add_circle</span>
+        <p className="mt-1 font-medium">Upload New</p>
+      </div>
+    </div>
+  );
+}
+
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -64,73 +104,91 @@ export default function Dashboard() {
     router.push(`/${doc.id}`);
   };
 
+  const recentDocuments = documents.slice(0, 3);
+  const keyInsights = documents.filter(d => d.analysis).slice(0, 2);
+  const flaggedRisks = documents.filter(d => d.analysis && d.analysis.risks.riskyClauses.length > 0).slice(0, 2);
+
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <Header />
-      <main className="flex-1">
-        <div className="container mx-auto p-4 md:p-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="font-headline">My Documents</CardTitle>
-                <CardDescription>
-                  Here are all the legal documents you've analyzed.
-                </CardDescription>
+    <LexeaseLayout>
+      <main className="flex-1 p-10 overflow-y-auto">
+        <header className="flex justify-between items-center mb-10">
+          <div>
+            <h1 className="text-3xl font-bold text-primary">Dashboard</h1>
+            <p className="text-muted-foreground mt-1">Welcome back! Here's an overview of your legal documents.</p>
+          </div>
+          <Button onClick={handleNewAnalysis} className="bg-accent text-white font-semibold py-2.5 px-6 rounded-lg hover:bg-accent/90 transition-colors flex items-center gap-2 shadow-sm">
+            <span className="material-symbols-outlined">upload_file</span>
+            Upload Document
+          </Button>
+        </header>
+
+        {isLoading ? (
+             <div className="flex justify-center items-center h-64">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+        ) : (
+          <div className="space-y-12">
+            <section>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-foreground">Recently Uploaded Documents</h2>
+                <a className="text-accent font-semibold hover:underline" href="#">View all</a>
               </div>
-              <Button onClick={handleNewAnalysis}>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                New Analysis
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex justify-center items-center h-40">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                {recentDocuments.map(doc => (
+                  <DocumentCard key={doc.id} doc={doc} onSelect={handleSelectDocument} />
+                ))}
+                <UploadNewCard onClick={handleNewAnalysis} />
+              </div>
+            </section>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+              <section>
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold text-foreground">Key Insights</h2>
+                  <a className="text-accent font-semibold hover:underline" href="#">View all</a>
                 </div>
-              ) : documents.length === 0 ? (
-                <div className="text-center py-16 border-2 border-dashed rounded-lg">
-                  <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
-                  <h3 className="mt-4 text-lg font-medium">No documents yet</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Get started by analyzing your first document.
-                  </p>
-                  <Button className="mt-6" onClick={handleNewAnalysis}>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Analyze New Document
-                  </Button>
+                <div className="space-y-4">
+                  {keyInsights.length > 0 ? keyInsights.map(doc => (
+                     <div key={doc.id} onClick={() => handleSelectDocument(doc)} className="bg-white p-4 rounded-xl border border-border flex items-center gap-4 transition-shadow hover:shadow-md cursor-pointer">
+                        <div className="p-3 bg-blue-100 rounded-lg">
+                            <span className="material-symbols-outlined text-blue-600">summarize</span>
+                        </div>
+                        <div>
+                            <h3 className="font-semibold text-foreground">Summary of {doc.fileName}</h3>
+                            <p className="text-sm text-muted-foreground">Generated on {doc.createdAt?.toDate ? format(doc.createdAt.toDate(), "yyyy-MM-dd") : 'N/A'}</p>
+                        </div>
+                        <span className="material-symbols-outlined text-gray-400 ml-auto">chevron_right</span>
+                    </div>
+                  )) : <p className="text-muted-foreground">No insights generated yet.</p>}
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {documents.map((doc) => (
-                    <Card
-                      key={doc.id}
-                      className="cursor-pointer hover:shadow-md transition-shadow"
-                      onClick={() => handleSelectDocument(doc)}
-                    >
-                      <CardHeader>
-                        <CardTitle className="font-headline text-lg truncate flex items-center gap-2">
-                          <FileText className="h-5 w-5 text-primary" />
-                          {doc.fileName}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground">
-                          Analyzed{" "}
-                          {doc.createdAt?.toDate
-                            ? formatDistanceToNow(doc.createdAt.toDate(), {
-                                addSuffix: true,
-                              })
-                            : "a while ago"}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  ))}
+              </section>
+
+              <section>
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold text-foreground">Flagged Risks</h2>
+                  <a className="text-accent font-semibold hover:underline" href="#">View all</a>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                 <div className="space-y-4">
+                  {flaggedRisks.length > 0 ? flaggedRisks.flatMap(doc => 
+                    doc.analysis!.risks.riskyClauses.slice(0,1).map((risk, index) => (
+                      <div key={`${doc.id}-${index}`} onClick={() => handleSelectDocument(doc)} className="bg-white p-4 rounded-xl border border-red-200 flex items-center gap-4 transition-shadow hover:shadow-md cursor-pointer">
+                        <div className="p-3 bg-red-100 rounded-lg">
+                          <span className="material-symbols-outlined text-red-600">flag</span>
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-red-800 truncate">{risk}</h3>
+                          <p className="text-sm text-red-600">In {doc.fileName}, High Risk</p>
+                        </div>
+                        <span className="material-symbols-outlined text-gray-400 ml-auto">chevron_right</span>
+                      </div>
+                    ))
+                  ) : <p className="text-muted-foreground">No risks flagged yet.</p>}
+                </div>
+              </section>
+            </div>
+          </div>
+        )}
       </main>
-    </div>
+    </LexeaseLayout>
   );
 }

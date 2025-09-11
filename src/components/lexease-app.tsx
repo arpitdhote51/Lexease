@@ -37,6 +37,7 @@ import RisksDisplay from "./risks-display";
 import QAChat from "./qa-chat";
 import { Skeleton } from "./ui/skeleton";
 import type { DocumentData } from "./dashboard";
+import Header from "./layout/header";
 
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -72,7 +73,9 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
             risks: existingDocument.analysis.risks,
         });
       }
-      setFile(new File([], existingDocument.fileName));
+      if(existingDocument.fileName) {
+        setFile(new File([], existingDocument.fileName));
+      }
     } else {
         // Reset state for new analysis
         setDocumentText("");
@@ -182,7 +185,6 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
 
       if (user && file) {
           if (existingDocument) {
-              // This case might not be needed if analysis is always done once
               await setDoc(doc(db, 'documents', existingDocument.id), {
                   analysis: results,
               }, { merge: true });
@@ -211,7 +213,7 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
   };
   
   const AnalysisPlaceholder = () => (
-    <div className="space-y-4">
+    <div className="space-y-4 p-6">
       <Skeleton className="h-8 w-1/3" />
       <Skeleton className="h-40 w-full" />
       <Skeleton className="h-8 w-1/4" />
@@ -235,20 +237,22 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
 
 
   return (
-    <div className="container mx-auto p-4 md:p-8">
+    <>
+    <Header />
+    <main className="flex-1 p-10 overflow-y-auto">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         { !existingDocument && (
         <div className="lg:col-span-5">
-          <Card className="sticky top-8">
+          <Card className="sticky top-8 bg-white shadow-none border-border">
             <CardHeader>
-              <CardTitle className="font-headline">Document Input</CardTitle>
+              <CardTitle className="font-bold text-2xl text-foreground">Document Input</CardTitle>
               <CardDescription>
                 Upload a new document for analysis.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
                <div
-                className={`relative flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-lg  bg-muted  ${!existingDocument ? 'cursor-pointer hover:bg-muted/50' : 'cursor-not-allowed'}`}
+                className={`relative flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-xl bg-background  ${!existingDocument ? 'cursor-pointer hover:bg-gray-100' : 'cursor-not-allowed'}`}
                 onDrop={onDrop}
                 onDragOver={onDragOver}
                 >
@@ -268,7 +272,7 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                className="mt-2"
+                                className="mt-2 text-red-500 hover:text-red-700"
                                 onClick={() => {
                                     setFile(null);
                                     setDocumentText('');
@@ -283,7 +287,7 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
                 ) : (
                     <label htmlFor="file-upload" className={`w-full h-full flex flex-col items-center justify-center text-center ${!existingDocument ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
                         <FileUp className="h-12 w-12 text-muted-foreground" />
-                        <p className="mt-4 text-sm font-semibold">
+                        <p className="mt-4 text-sm font-semibold text-foreground">
                             Drag & drop or click to upload
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
@@ -294,7 +298,7 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
                 </div>
 
               <div className="space-y-4">
-                <Label>Select Your Role</Label>
+                <Label className="font-semibold text-foreground">Select Your Role</Label>
                 <RadioGroup
                   defaultValue="layperson"
                   className="flex flex-col sm:flex-row gap-4"
@@ -304,19 +308,19 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
                 >
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="layperson" id="r1" />
-                    <Label htmlFor="r1">Layperson</Label>
+                    <Label htmlFor="r1" className="text-foreground">Layperson</Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="lawStudent" id="r2" />
-                    <Label htmlFor="r2">Law Student</Label>
+                    <Label htmlFor="r2" className="text-foreground">Law Student</Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="lawyer" id="r3" />
-                    <Label htmlFor="r3">Lawyer</Label>
+                    <Label htmlFor="r3" className="text-foreground">Lawyer</Label>
                   </div>
                 </RadioGroup>
               </div>
-              <Button onClick={handleAnalyze} disabled={isLoading || !file || !!analysisResult} className="w-full">
+              <Button onClick={handleAnalyze} disabled={isLoading || !file || !!analysisResult} className="w-full bg-accent text-white font-semibold py-3 rounded-lg hover:bg-accent/90">
                 {isLoading && !analysisResult ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -331,9 +335,9 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
         </div>
         )}
         <div className={existingDocument ? "lg:col-span-12" : "lg:col-span-7"}>
-          <Card>
+          <Card className="bg-white shadow-none border-border">
             <CardHeader>
-              <CardTitle className="font-headline">
+              <CardTitle className="font-bold text-2xl text-foreground">
                 { existingDocument ? existingDocument.fileName : "Analysis Results" }
                 </CardTitle>
               <CardDescription>
@@ -348,7 +352,7 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
                   </div>
                 ) : (
                 <Tabs defaultValue="summary" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
+                  <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 bg-background">
                     <TabsTrigger value="summary">Summary</TabsTrigger>
                     <TabsTrigger value="entities">Key Entities</TabsTrigger>
                     <TabsTrigger value="risks">Risk Flags</TabsTrigger>
@@ -384,6 +388,7 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
           </Card>
         </div>
       </div>
-    </div>
+    </main>
+    </>
   );
 }
