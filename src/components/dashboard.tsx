@@ -29,12 +29,6 @@ export default function Dashboard() {
   const [selectedDocument, setSelectedDocument] = useState<DocumentData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    if (user && view === "dashboard") {
-      fetchDocuments();
-    }
-  }, [user, view]);
-
   const fetchDocuments = async () => {
     if (!user) return;
     setIsLoading(true);
@@ -56,6 +50,12 @@ export default function Dashboard() {
     }
   };
 
+  useEffect(() => {
+    if (user && view === "dashboard") {
+      fetchDocuments();
+    }
+  }, [user, view]);
+
   const handleNewAnalysis = () => {
     setSelectedDocument(null);
     setView("new_analysis");
@@ -68,7 +68,6 @@ export default function Dashboard() {
   
   const handleAnalysisComplete = () => {
       setView('dashboard');
-      fetchDocuments();
   }
 
   if (view === "new_analysis") {
@@ -122,9 +121,9 @@ export default function Dashboard() {
                   <CardContent>
                     <p className="text-sm text-muted-foreground">
                       Analyzed{" "}
-                      {formatDistanceToNow(doc.createdAt.toDate(), {
+                      {doc.createdAt?.toDate ? formatDistanceToNow(doc.createdAt.toDate(), {
                         addSuffix: true,
-                      })}
+                      }) : 'a while ago'}
                     </p>
                   </CardContent>
                 </Card>

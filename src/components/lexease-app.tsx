@@ -1,3 +1,4 @@
+
 "use client";
 import { useState, useCallback, useEffect } from "react";
 import { Loader2, FileUp, File, X, ArrowLeft } from "lucide-react";
@@ -63,7 +64,9 @@ export default function LexeaseApp({ onAnalysisComplete, existingDocument }: Lex
   useEffect(() => {
     if (existingDocument) {
       setDocumentText(existingDocument.documentText);
-      setAnalysisResult(existingDocument.analysis);
+      if (existingDocument.analysis) {
+        setAnalysisResult(existingDocument.analysis);
+      }
       setFile(new File([], existingDocument.fileName));
     }
   }, [existingDocument]);
@@ -83,6 +86,7 @@ export default function LexeaseApp({ onAnalysisComplete, existingDocument }: Lex
     const fileType = file.type;
 
     try {
+        let text = '';
         if (fileType === 'application/pdf') {
             const reader = new FileReader();
             reader.onload = async (e) => {
@@ -95,6 +99,7 @@ export default function LexeaseApp({ onAnalysisComplete, existingDocument }: Lex
                     fullText += textContent.items.map(item => (item as any).str).join(' ');
                 }
                 setDocumentText(fullText);
+                setIsLoading(false);
             };
             reader.readAsArrayBuffer(file);
         } else if (file.name.endsWith('.docx')) {
@@ -103,12 +108,14 @@ export default function LexeaseApp({ onAnalysisComplete, existingDocument }: Lex
                 const arrayBuffer = e.target?.result as ArrayBuffer;
                 const result = await mammoth.extractRawText({ arrayBuffer });
                 setDocumentText(result.value);
+                setIsLoading(false);
             };
             reader.readAsArrayBuffer(file);
         } else if (fileType === 'text/plain') {
             const reader = new FileReader();
             reader.onload = (e) => {
                 setDocumentText(e.target?.result as string);
+                setIsLoading(false);
             };
             reader.readAsText(file);
         } else {
@@ -118,6 +125,7 @@ export default function LexeaseApp({ onAnalysisComplete, existingDocument }: Lex
                 description: 'Please upload a PDF, DOCX, or TXT file.',
             });
             setFile(null);
+            setIsLoading(false);
         }
     } catch (error) {
         console.error('File processing error:', error);
@@ -127,17 +135,7 @@ export default function LexeaseApp({ onAnalysisComplete, existingDocument }: Lex
             description: 'There was an error processing your file.',
         });
         setFile(null);
-    } finally {
-        const reader = new FileReader();
-        reader.onloadend = () => setIsLoading(false);
-        reader.onerror = () => setIsLoading(false);
-        if (file.type === 'application/pdf' || file.name.endsWith('.docx')) {
-            reader.readAsArrayBuffer(file);
-        } else if (file.type === 'text/plain') {
-            reader.readAsText(file);
-        } else {
-            setIsLoading(false);
-        }
+        setIsLoading(false);
     }
   };
 
@@ -171,7 +169,7 @@ export default function LexeaseApp({ onAnalysisComplete, existingDocument }: Lex
       const results = { summary, entities, risks };
       setAnalysisResult(results);
 
-      if (user && file) {
+      if (user && file && !existingDocument) {
           await addDoc(collection(db, 'documents'), {
               userId: user.uid,
               fileName: file.name,
@@ -180,7 +178,6 @@ export default function LexeaseApp({ onAnalysisComplete, existingDocument }: Lex
               createdAt: serverTimestamp()
           });
       }
-
 
     } catch (error) {
       console.error("Analysis failed:", error);
@@ -205,13 +202,13 @@ export default function LexeaseApp({ onAnalysisComplete, existingDocument }: Lex
   
   const onDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    if(existingDocument) return;
+    if(existingDocument || isLoading) return;
     const files = event.dataTransfer.files;
     if (files && files.length > 0) {
       setFile(files[0]);
       processFile(files[0]);
     }
-  }, [existingDocument]);
+  }, [existingDocument, isLoading]);
 
   const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -326,7 +323,7 @@ export default function LexeaseApp({ onAnalysisComplete, existingDocument }: Lex
             </CardHeader>
             <CardContent>
               {isLoading && !analysisResult ? <AnalysisPlaceholder /> :
-                !analysisResult ? (
+                !analysisResult && !documentText ? (
                   <div className="text-center text-muted-foreground py-16">
                     <p>Your analysis results will appear here once you upload and analyze a document.</p>
                   </div>
@@ -338,18 +335,30 @@ export default function LexeaseApp({ onAnalysisComplete, existingDocument }: Lex
                     <TabsTrigger value="risks">Risk Flags</TabsTrigger>
                     <TabsTrigger value="qa">Q&A</TabsTrigger>
                   </TabsList>
-                  <TabsContent value="summary">
-                    <SummaryDisplay summary={analysisResult.summary.plainLanguageSummary} />
-                  </TabsContent>
-                  <TabsContent value="entities">
-                    <EntitiesDisplay entities={analysisResult.entities.entities} />
-                  </TabsContent>
-                  <TabsContent value="risks">
-                    <RisksDisplay risks={analysisResult.risks.riskyClauses} />
-                  </TabsContent>
-                  <TabsContent value="qa">
-                    <QAChat documentText={documentText} />
-                  </TabsContent>
+                  {analysisResult ? (
+                    <>
+                      <TabsContent value="summary">
+                        <SummaryDisplay summary={analysisResult.summary.plainLanguageSummary} />
+                      </TabsContent>
+                      <TabsContent value="entities">
+                        <EntitiesDisplay entities={analysisResult.entities.entities} />
+                      </TabsContent>
+                      <TabsContent value="risks">
+                        <RisksDisplay risks={analysisResult.risks.riskyClauses} />
+                      </TabsContent>
+                      <TabsContent value="qa">
+                        <QAChat documentText={documentText} />
+                      </TabsContent>
+                    </>
+                  ) : (
+                    <div className="text-center text-muted-foreground py-16">
+                        {isLoading ? (
+                            <AnalysisPlaceholder />
+                        ) : (
+                             <p>Click "Analyze Document" to see the results.</p>
+                        )}
+                    </div>
+                  )}
                 </Tabs>
               )}
             </CardContent>
