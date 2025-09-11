@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -21,6 +22,7 @@ interface Message {
   id?: string;
   role: "user" | "assistant";
   content: string;
+  timestamp?: any;
 }
 
 export default function QAChat({ documentText, documentId }: QAChatProps) {
@@ -41,16 +43,33 @@ export default function QAChat({ documentText, documentId }: QAChatProps) {
   useEffect(() => {
     if (!documentId) return;
 
-    const q = query(collection(db, "documents", documentId, "messages"), orderBy("timestamp", "asc"));
+    const messagesCol = collection(db, "documents", documentId, "messages");
+    const q = query(messagesCol, orderBy("timestamp", "asc"));
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const history = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
+      const history: Message[] = [];
+       querySnapshot.forEach((doc) => {
+         history.push({ id: doc.id, ...doc.data() } as Message);
+       });
       setMessages(history);
       scrollToBottom();
+    }, (error) => {
+      console.error("Error fetching chat history: ", error);
+      // If the collection doesn't exist, it might throw an error.
+      // We can ignore this for a new document.
+      if (error.code === 'failed-precondition') {
+          console.log("Chat history collection doesn't exist yet.");
+      } else {
+          toast({
+              variant: "destructive",
+              title: "Error",
+              description: "Could not load chat history."
+          });
+      }
     });
 
     return () => unsubscribe();
-  }, [documentId, scrollToBottom]);
+  }, [documentId, scrollToBottom, toast]);
 
 
   useEffect(() => {
@@ -62,30 +81,25 @@ export default function QAChat({ documentText, documentId }: QAChatProps) {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
-    const userMessage: Message = { role: "user", content: input };
+    const userMessage: Message = { role: "user", content: input, timestamp: serverTimestamp() };
     
-    setMessages((prev) => [...prev, userMessage]); 
     setInput("");
     setIsLoading(true);
 
     try {
         const messagesCol = collection(db, "documents", documentId, "messages");
-        await addDoc(messagesCol, {
-            ...userMessage,
-            timestamp: serverTimestamp(),
-        });
+        // Add user message to Firestore optimistically
+        await addDoc(messagesCol, userMessage);
         
         const qaInput: InteractiveQAInput = {
             documentText,
             question: input,
         };
         const result = await interactiveQA(qaInput);
-        const assistantMessage: Message = { role: "assistant", content: result.answer };
+        const assistantMessage: Message = { role: "assistant", content: result.answer, timestamp: serverTimestamp() };
 
-        await addDoc(messagesCol, {
-            ...assistantMessage,
-            timestamp: serverTimestamp(),
-        });
+        // Add assistant message to Firestore
+        await addDoc(messagesCol, assistantMessage);
 
     } catch (error) {
         console.error("Q&A failed:", error);
@@ -94,7 +108,8 @@ export default function QAChat({ documentText, documentId }: QAChatProps) {
             title: "Error",
             description: "Could not get an answer. Please try again."
         });
-        setMessages(prev => prev.filter(msg => msg !== userMessage));
+        // Remove the optimistic user message if the API call fails
+        setMessages(prev => prev.filter(msg => msg.content !== userMessage.content));
     } finally {
         setIsLoading(false);
     }
