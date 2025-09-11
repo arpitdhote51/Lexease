@@ -11,8 +11,9 @@ import { useToast } from "@/hooks/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 import mammoth from 'mammoth';
 import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp, doc, setDoc, getDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, setDoc } from "firebase/firestore";
 import { useAuth } from "@/hooks/use-auth";
+import { useRouter } from "next/navigation";
 
 import {
   plainLanguageSummarization,
@@ -43,12 +44,12 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 type UserRole = "layperson" | "lawStudent" | "lawyer";
 
 interface LexeaseAppProps {
-    onAnalysisComplete: () => void;
-    existingDocument: DocumentData | null;
+    existingDocument?: DocumentData | null;
 }
 
-export default function LexeaseApp({ onAnalysisComplete, existingDocument }: LexeaseAppProps) {
+export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
   const { user } = useAuth();
+  const router = useRouter();
   const [documentText, setDocumentText] = useState("");
   const [userRole, setUserRole] = useState<UserRole>("layperson");
   const [isLoading, setIsLoading] = useState(false);
@@ -65,7 +66,6 @@ export default function LexeaseApp({ onAnalysisComplete, existingDocument }: Lex
     if (existingDocument) {
       setDocumentText(existingDocument.documentText);
       if (existingDocument.analysis) {
-        // Correctly set the analysis result from the existing document
         setAnalysisResult({
             summary: existingDocument.analysis.summary,
             entities: existingDocument.analysis.entities,
@@ -73,6 +73,12 @@ export default function LexeaseApp({ onAnalysisComplete, existingDocument }: Lex
         });
       }
       setFile(new File([], existingDocument.fileName));
+    } else {
+        // Reset state for new analysis
+        setDocumentText("");
+        setAnalysisResult(null);
+        setFile(null);
+        setUserRole("layperson");
     }
   }, [existingDocument]);
 
@@ -174,14 +180,22 @@ export default function LexeaseApp({ onAnalysisComplete, existingDocument }: Lex
       const results = { summary, entities, risks };
       setAnalysisResult(results);
 
-      if (user && file && !existingDocument) {
-          await addDoc(collection(db, 'documents'), {
-              userId: user.uid,
-              fileName: file.name,
-              documentText,
-              analysis: results,
-              createdAt: serverTimestamp()
-          });
+      if (user && file) {
+          if (existingDocument) {
+              // This case might not be needed if analysis is always done once
+              await setDoc(doc(db, 'documents', existingDocument.id), {
+                  analysis: results,
+              }, { merge: true });
+          } else {
+              const newDocRef = await addDoc(collection(db, 'documents'), {
+                  userId: user.uid,
+                  fileName: file.name,
+                  documentText,
+                  analysis: results,
+                  createdAt: serverTimestamp()
+              });
+              router.push(`/${newDocRef.id}`);
+          }
       }
 
     } catch (error) {
@@ -222,17 +236,14 @@ export default function LexeaseApp({ onAnalysisComplete, existingDocument }: Lex
 
   return (
     <div className="container mx-auto p-4 md:p-8">
-        <Button variant="ghost" onClick={onAnalysisComplete} className="mb-4">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Dashboard
-        </Button>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        { !existingDocument && (
         <div className="lg:col-span-5">
           <Card className="sticky top-8">
             <CardHeader>
               <CardTitle className="font-headline">Document Input</CardTitle>
               <CardDescription>
-                {existingDocument ? "Viewing analysis for a saved document." : "Upload a new document for analysis."}
+                Upload a new document for analysis.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -318,12 +329,15 @@ export default function LexeaseApp({ onAnalysisComplete, existingDocument }: Lex
             </CardContent>
           </Card>
         </div>
-        <div className="lg:col-span-7">
+        )}
+        <div className={existingDocument ? "lg:col-span-12" : "lg:col-span-7"}>
           <Card>
             <CardHeader>
-              <CardTitle className="font-headline">Analysis Results</CardTitle>
+              <CardTitle className="font-headline">
+                { existingDocument ? existingDocument.fileName : "Analysis Results" }
+                </CardTitle>
               <CardDescription>
-                Here is a breakdown of your legal document.
+                { existingDocument ? "Viewing analysis for your document." : "Here is a breakdown of your legal document." }
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -352,7 +366,7 @@ export default function LexeaseApp({ onAnalysisComplete, existingDocument }: Lex
                         <RisksDisplay risks={analysisResult.risks.riskyClauses} />
                       </TabsContent>
                       <TabsContent value="qa">
-                        <QAChat documentText={documentText} />
+                        <QAChat documentId={existingDocument!.id} documentText={documentText} />
                       </TabsContent>
                     </>
                   ) : (

@@ -1,54 +1,95 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Send, User, Bot } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { interactiveQA, InteractiveQAInput, InteractiveQAOutput } from "@/ai/flows/interactive-qa";
+import { interactiveQA, InteractiveQAInput } from "@/ai/flows/interactive-qa";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "firebase/firestore";
 
 interface QAChatProps {
   documentText: string;
+  documentId: string;
 }
 
 interface Message {
+  id?: string;
   role: "user" | "assistant";
   content: string;
 }
 
-export default function QAChat({ documentText }: QAChatProps) {
+export default function QAChat({ documentText, documentId }: QAChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  const scrollToBottom = useCallback(() => {
     if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+        setTimeout(() => {
+            scrollAreaRef.current!.scrollTo({ top: scrollAreaRef.current!.scrollHeight, behavior: 'smooth' });
+        }, 100);
     }
-  }, [messages]);
+  }, []);
+
+  useEffect(() => {
+    if (!documentId) return;
+
+    const q = query(collection(db, "documents", documentId, "messages"), orderBy("timestamp", "asc"));
+    
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const history = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
+      setMessages(history);
+      scrollToBottom();
+    });
+
+    return () => unsubscribe();
+  }, [documentId, scrollToBottom]);
+
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
     const userMessage: Message = { role: "user", content: input };
-    setMessages((prev) => [...prev, userMessage]);
+    
+    // Optimistically update UI
+    setMessages((prev) => [...prev, userMessage]); 
     setInput("");
     setIsLoading(true);
 
     try {
+        // Save user message to Firestore
+        const messagesCol = collection(db, "documents", documentId, "messages");
+        await addDoc(messagesCol, {
+            ...userMessage,
+            timestamp: serverTimestamp(),
+        });
+        
         const qaInput: InteractiveQAInput = {
             documentText,
             question: input,
         };
         const result = await interactiveQA(qaInput);
         const assistantMessage: Message = { role: "assistant", content: result.answer };
-        setMessages((prev) => [...prev, assistantMessage]);
+
+        // Save assistant message to Firestore
+        await addDoc(messagesCol, {
+            ...assistantMessage,
+            timestamp: serverTimestamp(),
+        });
+        // The onSnapshot listener will update the state with the new messages
 
     } catch (error) {
         console.error("Q&A failed:", error);
@@ -57,7 +98,8 @@ export default function QAChat({ documentText }: QAChatProps) {
             title: "Error",
             description: "Could not get an answer. Please try again."
         });
-        setMessages(prev => prev.slice(0, -1)); // Remove user message on error
+        // On error, remove the optimistic user message. Firestore won't have it.
+        setMessages(prev => prev.filter(msg => msg !== userMessage));
     } finally {
         setIsLoading(false);
     }
@@ -73,7 +115,7 @@ export default function QAChat({ documentText }: QAChatProps) {
           <div className="space-y-4">
             {messages.map((message, index) => (
               <div
-                key={index}
+                key={message.id || index}
                 className={`flex items-start gap-3 ${
                   message.role === "user" ? "justify-end" : ""
                 }`}

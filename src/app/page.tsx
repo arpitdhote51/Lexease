@@ -1,23 +1,27 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
-import Header from '@/components/layout/header';
-import Dashboard from '@/components/dashboard';
 import { Loader2 } from 'lucide-react';
+import Dashboard from '@/components/dashboard';
 
 export default function Home() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const [initialLoad, setInitialLoad] = useState(true);
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/auth');
+    if (!loading) {
+      if (!user) {
+        router.push('/auth');
+      } else {
+        setInitialLoad(false);
+      }
     }
   }, [user, loading, router]);
 
-  if (loading || !user) {
+  if (initialLoad) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -25,12 +29,5 @@ export default function Home() {
     );
   }
   
-  return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <Header />
-      <main className="flex-1">
-        <Dashboard />
-      </main>
-    </div>
-  );
+  return <Dashboard />;
 }
