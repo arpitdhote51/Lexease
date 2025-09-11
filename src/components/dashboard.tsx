@@ -16,6 +16,7 @@ export type DocumentData = {
   fileName: string;
   createdAt: any;
   documentText: string;
+  userId?: string;
   analysis?: {
     summary: { plainLanguageSummary: string };
     entities: { entities: { type: string; value: string }[] };
@@ -69,28 +70,28 @@ export default function Dashboard() {
   const [documents, setDocuments] = useState<DocumentData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchDocuments = async () => {
-    if (!user) return;
-    setIsLoading(true);
-    try {
-      const q = query(
-        collection(db, "documents"),
-        where("userId", "==", user.uid),
-        orderBy("createdAt", "desc")
-      );
-      const querySnapshot = await getDocs(q);
-      const docs = querySnapshot.docs.map(
-        (doc) => ({ id: doc.id, ...doc.data() } as DocumentData)
-      );
-      setDocuments(docs);
-    } catch (error) {
-      console.error("Error fetching documents: ", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const fetchDocuments = async () => {
+      if (!user) return;
+      setIsLoading(true);
+      try {
+        const q = query(
+          collection(db, "documents"),
+          where("userId", "==", user.uid),
+          orderBy("createdAt", "desc")
+        );
+        const querySnapshot = await getDocs(q);
+        const docs = querySnapshot.docs.map(
+          (doc) => ({ id: doc.id, ...doc.data() } as DocumentData)
+        );
+        setDocuments(docs);
+      } catch (error) {
+        console.error("Error fetching documents: ", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     if (user) {
       fetchDocuments();
     }
@@ -106,7 +107,9 @@ export default function Dashboard() {
 
   const recentDocuments = documents.slice(0, 3);
   const keyInsights = documents.filter(d => d.analysis).slice(0, 2);
-  const flaggedRisks = documents.filter(d => d.analysis && d.analysis.risks.riskyClauses.length > 0).slice(0, 2);
+  const flaggedRisks = documents
+    .filter(d => d.analysis && d.analysis.risks && d.analysis.risks.riskyClauses.length > 0)
+    .slice(0, 2);
 
   return (
     <LexeaseLayout>
