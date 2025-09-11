@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 import mammoth from 'mammoth';
 import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, setDoc, getDoc } from "firebase/firestore";
 import { useAuth } from "@/hooks/use-auth";
 
 import {
@@ -65,7 +65,12 @@ export default function LexeaseApp({ onAnalysisComplete, existingDocument }: Lex
     if (existingDocument) {
       setDocumentText(existingDocument.documentText);
       if (existingDocument.analysis) {
-        setAnalysisResult(existingDocument.analysis);
+        // Correctly set the analysis result from the existing document
+        setAnalysisResult({
+            summary: existingDocument.analysis.summary,
+            entities: existingDocument.analysis.entities,
+            risks: existingDocument.analysis.risks,
+        });
       }
       setFile(new File([], existingDocument.fileName));
     }
@@ -323,7 +328,7 @@ export default function LexeaseApp({ onAnalysisComplete, existingDocument }: Lex
             </CardHeader>
             <CardContent>
               {isLoading && !analysisResult ? <AnalysisPlaceholder /> :
-                !analysisResult && !documentText ? (
+                !analysisResult && !documentText && !existingDocument ? (
                   <div className="text-center text-muted-foreground py-16">
                     <p>Your analysis results will appear here once you upload and analyze a document.</p>
                   </div>

@@ -67,6 +67,7 @@ export default function Dashboard() {
   };
   
   const handleAnalysisComplete = () => {
+      setSelectedDocument(null);
       setView('dashboard');
   }
 
