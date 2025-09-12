@@ -88,7 +88,7 @@ function ConfirmationContent() {
                 </div>
                 
                 <p className="text-xs text-center text-muted-foreground px-4">
-                    A confirmation email with all the details has been sent to you and {lawyer.name}. Please check your inbox.
+                    A confirmation email with all the details has been sent to you and to {lawyer.email}. Please check your inbox.
                 </p>
 
                  <div className="text-center pt-4">
