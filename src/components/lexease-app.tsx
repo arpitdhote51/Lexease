@@ -356,7 +356,7 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
                     <TabsTrigger value="summary">Summary</TabsTrigger>
                     <TabsTrigger value="entities">Key Entities</TabsTrigger>
                     <TabsTrigger value="risks">Risk Flags</TabsTrigger>
-                    <TabsTrigger value="qa">Q&A</TabsTrigger>
+                    {existingDocument && <TabsTrigger value="qa">Q&A</TabsTrigger>}
                   </TabsList>
                   {analysisResult ? (
                     <>
@@ -369,9 +369,11 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
                       <TabsContent value="risks">
                         <RisksDisplay risks={analysisResult.risks.riskyClauses} />
                       </TabsContent>
-                      <TabsContent value="qa">
-                        <QAChat documentId={existingDocument!.id} documentText={documentText} />
-                      </TabsContent>
+                      {existingDocument && (
+                        <TabsContent value="qa">
+                          <QAChat documentId={existingDocument.id} documentText={documentText} />
+                        </TabsContent>
+                      )}
                     </>
                   ) : (
                     <div className="text-center text-muted-foreground py-16">
@@ -392,3 +394,5 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
     </>
   );
 }
+
+    
