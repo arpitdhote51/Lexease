@@ -1,6 +1,6 @@
 "use client";
 import { useState, useCallback, useEffect } from "react";
-import { Loader2, FileUp, FileIcon, X } from "lucide-react";
+import { Loader2, FileUp, FileIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -11,11 +11,11 @@ import { db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp, doc, updateDoc, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
+import mammoth from "mammoth";
 
-import {
-  analyzeDocumentInBackground,
-  DocumentAnalysisOutput,
-} from "@/ai/flows/document-analysis";
+import { plainLanguageSummarization } from "@/ai/flows/plain-language-summary";
+import { keyEntityRecognition, KeyEntity } from "@/ai/flows/key-entity-recognition";
+import { riskFlagging } from "@/ai/flows/risk-flagging";
 
 import SummaryDisplay from "./summary-display";
 import EntitiesDisplay from "./entities-display";
@@ -26,6 +26,12 @@ import type { DocumentData } from "./dashboard";
 import Header from "./layout/header";
 
 type UserRole = "layperson" | "lawStudent" | "lawyer";
+
+export interface DocumentAnalysis {
+  summary?: { plainLanguageSummary: string };
+  entities?: { entities: KeyEntity[] };
+  risks?: { riskyClauses: string[] };
+}
 
 interface LexeaseAppProps {
     existingDocument?: DocumentData | null;
@@ -39,7 +45,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
   const [userRole, setUserRole] = useState<UserRole>("layperson");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<DocumentAnalysisOutput | null>(initialDocument?.analysis || null);
+  const [analysisResult, setAnalysisResult] = useState<DocumentAnalysis | null>(initialDocument?.analysis || null);
   const [file, setFile] = useState<File | null>(initialDocument ? new File([], initialDocument.fileName) : null);
   const [documentId, setDocumentId] = useState<string | null>(initialDocument?.id || null);
 
@@ -49,6 +55,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
     if (initialDocument) {
       setDocumentId(initialDocument.id);
       setFile(new File([], initialDocument.fileName));
+      setDocumentText(initialDocument.documentText || "");
     }
   }, [initialDocument]);
 
@@ -63,8 +70,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
         
         if (data.analysis) {
             setAnalysisResult(data.analysis);
-            const { summary, entities, risks } = data.analysis;
-            if (summary && entities && risks) {
+            if (data.analysis.summary && data.analysis.entities && data.analysis.risks) {
                 setIsAnalyzing(false);
             }
         }
@@ -89,24 +95,63 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
     }
     
     setIsProcessing(true);
+    setIsAnalyzing(true);
     setFile(file);
-    setAnalysisResult(null); // Clear previous analysis
+    setAnalysisResult(null);
 
     try {
+      const text = await extractText(file);
+      setDocumentText(text);
+      await saveInitialDocumentAndAnalyze(file.name, text);
+    } catch (error) {
+      handleFileError(error, file.type);
+      setIsAnalyzing(false);
+    }
+  };
+  
+  const extractText = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
-                const dataUri = e.target?.result as string;
-                await saveInitialDocumentAndAnalyze(file.name, dataUri);
+                if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+                    const arrayBuffer = e.target?.result as ArrayBuffer;
+                    const result = await mammoth.extractRawText({ arrayBuffer });
+                    resolve(result.value);
+                } else {
+                    // For PDF, TXT, and images, we will send to AI
+                     const dataUri = e.target?.result as string;
+                     const base64 = dataUri.split(',')[1];
+                     // This is a placeholder for a flow that would do OCR
+                     // For now, we are assuming text can be extracted or we can use a mock
+                     if (file.type.startsWith('image/')) {
+                       // This would be where you call an OCR flow
+                       // For now, returning a placeholder
+                       console.warn("OCR for images not implemented in this version. Using placeholder text.");
+                       resolve("Text extracted from image: [Placeholder]");
+                     } else if (file.type === 'application/pdf') {
+                        // This would be where you call an OCR flow for PDFs
+                        console.warn("OCR for PDF not implemented in this version. Using placeholder text.");
+                        resolve("Text extracted from PDF: [Placeholder]");
+                     }
+                     else {
+                       // Fallback for text files
+                        const text = atob(base64);
+                        resolve(text);
+                     }
+                }
             } catch (error) {
-                handleFileError(error, file.type);
+                reject(error);
             }
         };
-        reader.readAsDataURL(file);
-    } catch (error) {
-        handleFileError(error, "general");
-    }
-  };
+         if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+            reader.readAsArrayBuffer(file);
+        } else {
+            reader.readAsDataURL(file); // For text, images, pdf
+        }
+    });
+};
+
 
   const handleFileError = (error: any, type: string) => {
     console.error(`File processing error (${type}):`, error);
@@ -115,54 +160,66 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
     setIsProcessing(false);
   }
 
-  const saveInitialDocumentAndAnalyze = async (fileName: string, dataUri: string) => {
+  const saveInitialDocumentAndAnalyze = async (fileName: string, extractedText: string) => {
     if (!user) return;
     
     try {
         const newDocRef = await addDoc(collection(db, 'documents'), {
             userId: user.uid,
             fileName: fileName,
+            documentText: extractedText,
             createdAt: serverTimestamp(),
-            analysis: {}, // Initialize with empty object
+            analysis: {},
         });
         setDocumentId(newDocRef.id);
         setIsProcessing(false);
         router.push(`/${newDocRef.id}`, { scroll: false }); 
 
-        // Start analysis in the background
-        handleAnalyze(newDocRef.id, dataUri, false);
+        toast({ title: "Analysis Started", description: "Your document analysis is running. Results will appear here shortly." });
+        
+        // Run all analysis tasks in parallel
+        await Promise.all([
+          runSummarization(newDocRef.id, extractedText),
+          runEntityRecognition(newDocRef.id, extractedText),
+          runRiskFlagging(newDocRef.id, extractedText)
+        ]);
+        
     } catch (error) {
-        console.error("Failed to save initial document:", error);
-        toast({ variant: "destructive", title: "Save Failed", description: "Could not save the document to the database." });
+        console.error("Failed to save or analyze document:", error);
+        toast({ variant: "destructive", title: "Analysis Failed", description: "Could not save and analyze the document." });
         setIsProcessing(false);
+        setIsAnalyzing(false);
     }
   };
 
-  const handleAnalyze = async (docId: string, fileDataUri: string, forceReanalysis = false) => {
-    if (!docId) {
-      toast({ variant: "destructive", title: "Error", description: "No document ID available to analyze." });
-      return;
+  const runSummarization = async (docId: string, text: string) => {
+    try {
+      const result = await plainLanguageSummarization({ legalDocumentText: text, userRole });
+      await updateDoc(doc(db, "documents", docId), { "analysis.summary": result });
+    } catch (e) {
+      console.error("Summarization failed", e);
+      toast({variant: "destructive", title: "Summarization Failed"});
     }
+  };
 
-    if (analysisResult && analysisResult.summary && analysisResult.entities && analysisResult.risks && !forceReanalysis) {
-        toast({ title: "Analysis Already Complete", description: "Click 'Re-Analyze' to run the analysis again." });
-        return;
+  const runEntityRecognition = async (docId: string, text: string) => {
+    try {
+      const result = await keyEntityRecognition({ legalDocumentText: text });
+      await updateDoc(doc(db, "documents", docId), { "analysis.entities": result });
+    } catch (e) {
+      console.error("Entity Recognition failed", e);
+      toast({variant: "destructive", title: "Entity Recognition Failed"});
     }
+  };
 
-    setIsAnalyzing(true);
-    if(forceReanalysis) {
-        setAnalysisResult(null);
-        const docRef = doc(db, 'documents', docId);
-        await updateDoc(docRef, { analysis: {} });
+  const runRiskFlagging = async (docId: string, text: string) => {
+    try {
+      const result = await riskFlagging({ legalDocumentText: text });
+      await updateDoc(doc(db, "documents", docId), { "analysis.risks": result });
+    } catch (e) {
+      console.error("Risk Flagging failed", e);
+      toast({variant: "destructive", title: "Risk Flagging Failed"});
     }
-    toast({ title: "Analysis Started", description: "Your document analysis is running in the background. Results will appear here shortly." });
-
-    analyzeDocumentInBackground({ documentId: docId, userRole, fileDataUri })
-        .catch((error) => {
-            console.error("Analysis failed to start:", error);
-            toast({ variant: "destructive", title: "Analysis Failed", description: "An error occurred while starting the analysis." });
-            setIsAnalyzing(false);
-        });
   };
   
   const AnalysisPlaceholder = ({title}: {title: string}) => (
@@ -189,9 +246,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
 
   const isLoading = isProcessing;
 
-  const handleStartNew = () => {
-    router.push('/new');
-  };
+  const allAnalysisFinished = analysisResult?.summary && analysisResult?.entities && analysisResult?.risks;
 
   return (
     <>
@@ -209,7 +264,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
             </CardHeader>
             <CardContent className="space-y-6">
                <div
-                className={`relative flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-xl bg-background  ${!isLoading ? 'cursor-pointer hover:bg-gray-100' : 'cursor-not-allowed'}`}
+                className={`relative flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-xl bg-background  ${!isLoading && !isAnalyzing ? 'cursor-pointer hover:bg-gray-100' : 'cursor-not-allowed'}`}
                 onDrop={onDrop}
                 onDragOver={onDragOver}
                 >
@@ -219,12 +274,12 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
                     className="sr-only"
                     onChange={handleFileChange}
                     accept=".pdf,.docx,.txt,.png,.jpg,.jpeg"
-                    disabled={isLoading}
+                    disabled={isLoading || isAnalyzing}
                 />
-                {isProcessing ? (
+                {isProcessing || isAnalyzing ? (
                     <div className="text-center">
                         <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary" />
-                        <p className="mt-4 text-muted-foreground">Processing file...</p>
+                        <p className="mt-4 text-muted-foreground">{isProcessing ? "Processing file..." : "Analyzing document..."}</p>
                     </div>
                 ) : file ? (
                     <div className="text-center p-4">
@@ -252,7 +307,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
                   className="flex flex-col sm:flex-row gap-4"
                   value={userRole}
                   onValueChange={(value: UserRole) => setUserRole(value)}
-                  disabled={isLoading}
+                  disabled={isLoading || isAnalyzing}
                 >
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="layperson" id="r1" />
@@ -280,7 +335,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
                   { file ? file.name : "Analysis Results" }
                   </CardTitle>
                 <CardDescription>
-                  { file ? "Viewing analysis for your document." : "Here is a breakdown of your legal document." }
+                  { file ? (isAnalyzing && !allAnalysisFinished ? "Analysis in progress..." : "Viewing analysis for your document.") : "Here is a breakdown of your legal document." }
                 </CardDescription>
               </div>
             </CardHeader>

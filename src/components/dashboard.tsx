@@ -9,7 +9,7 @@ import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { DocumentAnalysisOutput } from "@/ai/flows/document-analysis";
+import { DocumentAnalysis } from "./lexease-app";
 
 export type DocumentData = {
   id: string;
@@ -17,11 +17,11 @@ export type DocumentData = {
   createdAt: any;
   documentText: string;
   userId?: string;
-  analysis?: DocumentAnalysisOutput;
+  analysis?: DocumentAnalysis;
 };
 
 function DocumentCard({ doc, onSelect }: { doc: DocumentData, onSelect: (doc: DocumentData) => void }) {
-  const analysisComplete = !!doc.analysis;
+  const analysisComplete = !!doc.analysis?.summary && !!doc.analysis?.entities && !!doc.analysis?.risks;
   const cardStyles = "bg-white p-5 rounded-xl border border-border transition-all duration-300 hover:shadow-lg hover:-translate-y-1 cursor-pointer";
   
   return (
@@ -171,7 +171,7 @@ export default function Dashboard() {
                 </div>
                  <div className="space-y-4">
                   {flaggedRisks.length > 0 ? flaggedRisks.flatMap(doc => 
-                    doc.analysis!.risks.riskyClauses.slice(0,1).map((risk, index) => (
+                    doc.analysis!.risks!.riskyClauses.slice(0,1).map((risk, index) => (
                       <div key={`${doc.id}-${index}`} onClick={() => handleSelectDocument(doc)} className="bg-white p-4 rounded-xl border border-red-200 flex items-center gap-4 transition-shadow hover:shadow-md cursor-pointer">
                         <div className="p-3 bg-red-100 rounded-lg">
                           <span className="material-symbols-outlined text-red-600">flag</span>
