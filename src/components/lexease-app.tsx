@@ -1,7 +1,6 @@
-
 "use client";
 import { useState, useCallback, useEffect } from "react";
-import { Loader2, FileUp, File as FileIcon, X, ArrowLeft } from "lucide-react";
+import { Loader2, FileUp, File as FileIcon, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -11,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 import mammoth from 'mammoth';
 import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp, doc, setDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, setDoc, updateDoc } from "firebase/firestore";
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 
@@ -39,7 +38,6 @@ import { Skeleton } from "./ui/skeleton";
 import type { DocumentData } from "./dashboard";
 import Header from "./layout/header";
 
-
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 type UserRole = "layperson" | "lawStudent" | "lawyer";
@@ -48,167 +46,170 @@ interface LexeaseAppProps {
     existingDocument?: DocumentData | null;
 }
 
-export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
+export default function LexeaseApp({ existingDocument: initialDocument }: LexeaseAppProps) {
   const { user } = useAuth();
   const router = useRouter();
+  const [existingDocument, setExistingDocument] = useState(initialDocument);
   const [documentText, setDocumentText] = useState("");
   const [userRole, setUserRole] = useState<UserRole>("layperson");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<{
     summary: PlainLanguageSummarizationOutput;
     entities: KeyEntityRecognitionOutput;
     risks: RiskFlaggingOutput;
   } | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [documentId, setDocumentId] = useState<string | null>(initialDocument?.id || null);
 
   const { toast } = useToast();
 
   useEffect(() => {
-    if (existingDocument) {
-      setDocumentText(existingDocument.documentText);
-      if (existingDocument.analysis) {
+    if (initialDocument) {
+      setExistingDocument(initialDocument);
+      setDocumentText(initialDocument.documentText);
+      setDocumentId(initialDocument.id);
+      if (initialDocument.analysis) {
         setAnalysisResult({
-            summary: existingDocument.analysis.summary,
-            entities: existingDocument.analysis.entities,
-            risks: existingDocument.analysis.risks,
+            summary: initialDocument.analysis.summary,
+            entities: initialDocument.analysis.entities,
+            risks: initialDocument.analysis.risks,
         });
       }
-      if(existingDocument.fileName) {
-        setFile(new File([], existingDocument.fileName));
+      if(initialDocument.fileName) {
+        setFile(new File([], initialDocument.fileName));
       }
     } else {
-        // Reset state for new analysis
+        setExistingDocument(null);
         setDocumentText("");
         setAnalysisResult(null);
         setFile(null);
         setUserRole("layperson");
+        setDocumentId(null);
     }
-  }, [existingDocument]);
-
+  }, [initialDocument]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-        setFile(selectedFile);
         processFile(selectedFile);
     }
   };
 
   const processFile = async (file: File) => {
-    setIsLoading(true);
-    setDocumentText('');
-    const fileType = file.type;
+    if (!user) {
+        toast({ title: "Not Authenticated", description: "You must be logged in to upload a document.", variant: "destructive" });
+        return;
+    }
+    
+    setIsProcessing(true);
+    setFile(file);
+    setAnalysisResult(null); // Clear previous analysis
 
     try {
         let text = '';
-        if (fileType === 'application/pdf') {
+        if (file.type === 'application/pdf') {
             const reader = new FileReader();
             reader.onload = async (e) => {
-                const typedArray = new Uint8Array(e.target?.result as ArrayBuffer);
-                const pdf = await pdfjs.getDocument(typedArray).promise;
-                let fullText = '';
-                for (let i = 1; i <= pdf.numPages; i++) {
-                    const page = await pdf.getPage(i);
-                    const textContent = await page.getTextContent();
-                    fullText += textContent.items.map(item => (item as any).str).join(' ');
+                try {
+                    const typedArray = new Uint8Array(e.target?.result as ArrayBuffer);
+                    const pdf = await pdfjs.getDocument(typedArray).promise;
+                    let fullText = '';
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        fullText += textContent.items.map(item => (item as any).str).join(' ');
+                    }
+                    saveInitialDocument(file.name, fullText);
+                } catch (pdfError) {
+                    handleFileError(pdfError, "PDF");
                 }
-                setDocumentText(fullText);
-                setIsLoading(false);
             };
             reader.readAsArrayBuffer(file);
         } else if (file.name.endsWith('.docx')) {
             const reader = new FileReader();
             reader.onload = async (e) => {
-                const arrayBuffer = e.target?.result as ArrayBuffer;
-                const result = await mammoth.extractRawText({ arrayBuffer });
-                setDocumentText(result.value);
-                setIsLoading(false);
+                try {
+                    const arrayBuffer = e.target?.result as ArrayBuffer;
+                    const result = await mammoth.extractRawText({ arrayBuffer });
+                    saveInitialDocument(file.name, result.value);
+                } catch (docxError) {
+                    handleFileError(docxError, "DOCX");
+                }
             };
             reader.readAsArrayBuffer(file);
-        } else if (fileType === 'text/plain') {
+        } else if (file.type === 'text/plain') {
             const reader = new FileReader();
             reader.onload = (e) => {
-                setDocumentText(e.target?.result as string);
-                setIsLoading(false);
+                saveInitialDocument(file.name, e.target?.result as string);
             };
             reader.readAsText(file);
         } else {
-            toast({
-                variant: 'destructive',
-                title: 'Unsupported File Type',
-                description: 'Please upload a PDF, DOCX, or TXT file.',
-            });
+            toast({ variant: 'destructive', title: 'Unsupported File Type', description: 'Please upload a PDF, DOCX, or TXT file.' });
             setFile(null);
-            setIsLoading(false);
+            setIsProcessing(false);
         }
     } catch (error) {
-        console.error('File processing error:', error);
-        toast({
-            variant: 'destructive',
-            title: 'File Error',
-            description: 'There was an error processing your file.',
+        handleFileError(error, "general");
+    }
+  };
+
+  const handleFileError = (error: any, type: string) => {
+    console.error(`File processing error (${type}):`, error);
+    toast({ variant: 'destructive', title: `Error Processing ${type} File`, description: 'There was an error processing your file.' });
+    setFile(null);
+    setIsProcessing(false);
+  }
+
+  const saveInitialDocument = async (fileName: string, text: string) => {
+    if (!user) return;
+    setDocumentText(text);
+
+    try {
+        const newDocRef = await addDoc(collection(db, 'documents'), {
+            userId: user.uid,
+            fileName: fileName,
+            documentText: text,
+            createdAt: serverTimestamp(),
+            analysis: null,
         });
-        setFile(null);
-        setIsLoading(false);
+        setDocumentId(newDocRef.id);
+        router.push(`/${newDocRef.id}`, { scroll: false }); 
+    } catch (error) {
+        console.error("Failed to save initial document:", error);
+        toast({ variant: "destructive", title: "Save Failed", description: "Could not save the document to the database." });
+    } finally {
+        setIsProcessing(false);
     }
   };
 
   const handleAnalyze = async () => {
-    if (!documentText.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Please upload and process a file to analyze.",
-      });
+    if (!documentText.trim() || !documentId) {
+      toast({ variant: "destructive", title: "Error", description: "No document loaded to analyze." });
       return;
     }
 
-    setIsLoading(true);
+    setIsAnalyzing(true);
     setAnalysisResult(null);
 
     try {
-      const summarizationInput: PlainLanguageSummarizationInput = {
-        legalDocumentText: documentText,
-        userRole,
-      };
-      const entityInput: KeyEntityRecognitionInput = { documentText: documentText };
-      const riskInput: RiskFlaggingInput = { legalText: documentText };
-
       const [summary, entities, risks] = await Promise.all([
-        plainLanguageSummarization(summarizationInput),
-        identifyKeyEntities(entityInput),
-        riskFlagging(riskInput),
+        plainLanguageSummarization({ legalDocumentText: documentText, userRole }),
+        identifyKeyEntities({ documentText: documentText }),
+        riskFlagging({ legalText: documentText }),
       ]);
       
       const results = { summary, entities, risks };
       setAnalysisResult(results);
 
-      if (user && file) {
-          if (existingDocument) {
-              await setDoc(doc(db, 'documents', existingDocument.id), {
-                  analysis: results,
-              }, { merge: true });
-          } else {
-              const newDocRef = await addDoc(collection(db, 'documents'), {
-                  userId: user.uid,
-                  fileName: file.name,
-                  documentText,
-                  analysis: results,
-                  createdAt: serverTimestamp()
-              });
-              router.push(`/${newDocRef.id}`);
-          }
-      }
+      const docRef = doc(db, 'documents', documentId);
+      await updateDoc(docRef, { analysis: results });
 
     } catch (error) {
       console.error("Analysis failed:", error);
-      toast({
-        variant: "destructive",
-        title: "Analysis Failed",
-        description: "An error occurred while analyzing the document. Please try again.",
-      });
+      toast({ variant: "destructive", title: "Analysis Failed", description: "An error occurred while analyzing the document." });
     } finally {
-      setIsLoading(false);
+      setIsAnalyzing(false);
     }
   };
   
@@ -223,36 +224,36 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
   
   const onDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    if(existingDocument || isLoading) return;
+    if(isProcessing || isAnalyzing) return;
     const files = event.dataTransfer.files;
     if (files && files.length > 0) {
-      setFile(files[0]);
       processFile(files[0]);
     }
-  }, [existingDocument, isLoading]);
+  }, [isProcessing, isAnalyzing]);
 
   const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
   }, []);
 
+  const isLoading = isProcessing || isAnalyzing;
 
   return (
     <>
     <Header />
     <main className="flex-1 p-10 overflow-y-auto">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        { !existingDocument && (
+        { !initialDocument && (
         <div className="lg:col-span-5">
           <Card className="sticky top-8 bg-white shadow-none border-border">
             <CardHeader>
               <CardTitle className="font-bold text-2xl text-foreground">Document Input</CardTitle>
               <CardDescription>
-                Upload a new document for analysis.
+                Upload a document to get started.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
                <div
-                className={`relative flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-xl bg-background  ${!existingDocument ? 'cursor-pointer hover:bg-gray-100' : 'cursor-not-allowed'}`}
+                className={`relative flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-xl bg-background  ${!isLoading ? 'cursor-pointer hover:bg-gray-100' : 'cursor-not-allowed'}`}
                 onDrop={onDrop}
                 onDragOver={onDragOver}
                 >
@@ -262,30 +263,36 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
                     className="sr-only"
                     onChange={handleFileChange}
                     accept=".pdf,.docx,.txt"
-                    disabled={isLoading || !!existingDocument}
+                    disabled={isLoading}
                 />
-                {file ? (
+                {isProcessing ? (
+                    <div className="text-center">
+                        <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary" />
+                        <p className="mt-4 text-muted-foreground">Processing file...</p>
+                    </div>
+                ) : file ? (
                     <div className="text-center p-4">
                         <FileIcon className="mx-auto h-12 w-12 text-muted-foreground" />
                         <p className="mt-2 font-semibold truncate">{file.name}</p>
-                         {!existingDocument && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className="mt-2 text-red-500 hover:text-red-700"
-                                onClick={() => {
-                                    setFile(null);
-                                    setDocumentText('');
-                                    setAnalysisResult(null);
-                                }}
-                            >
-                                <X className="mr-2 h-4 w-4" />
-                                Remove
-                            </Button>
-                        )}
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="mt-2 text-red-500 hover:text-red-700"
+                            onClick={() => {
+                                setFile(null);
+                                setDocumentText('');
+                                setAnalysisResult(null);
+                                setDocumentId(null);
+                                router.push('/new');
+                            }}
+                            disabled={isLoading}
+                        >
+                            <X className="mr-2 h-4 w-4" />
+                            Remove
+                        </Button>
                     </div>
                 ) : (
-                    <label htmlFor="file-upload" className={`w-full h-full flex flex-col items-center justify-center text-center ${!existingDocument ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
+                    <label htmlFor="file-upload" className={`w-full h-full flex flex-col items-center justify-center text-center ${!isLoading ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
                         <FileUp className="h-12 w-12 text-muted-foreground" />
                         <p className="mt-4 text-sm font-semibold text-foreground">
                             Drag & drop or click to upload
@@ -304,7 +311,7 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
                   className="flex flex-col sm:flex-row gap-4"
                   value={userRole}
                   onValueChange={(value: UserRole) => setUserRole(value)}
-                  disabled={isLoading || !!existingDocument}
+                  disabled={isLoading}
                 >
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="layperson" id="r1" />
@@ -320,8 +327,8 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
                   </div>
                 </RadioGroup>
               </div>
-              <Button onClick={handleAnalyze} disabled={isLoading || !file || !!analysisResult} className="w-full bg-accent text-white font-semibold py-3 rounded-lg hover:bg-accent/90">
-                {isLoading && !analysisResult ? (
+              <Button onClick={handleAnalyze} disabled={isLoading || !documentId || !!analysisResult} className="w-full bg-accent text-white font-semibold py-3 rounded-lg hover:bg-accent/90">
+                {isAnalyzing ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Analyzing...
@@ -334,29 +341,29 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
           </Card>
         </div>
         )}
-        <div className={existingDocument ? "lg:col-span-12" : "lg:col-span-7"}>
+        <div className={initialDocument ? "lg:col-span-12" : "lg:col-span-7"}>
           <Card className="bg-white shadow-none border-border">
             <CardHeader>
               <CardTitle className="font-bold text-2xl text-foreground">
-                { existingDocument ? existingDocument.fileName : "Analysis Results" }
+                { file ? file.name : "Analysis Results" }
                 </CardTitle>
               <CardDescription>
-                { existingDocument ? "Viewing analysis for your document." : "Here is a breakdown of your legal document." }
+                { file ? "Viewing analysis for your document." : "Here is a breakdown of your legal document." }
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoading && !analysisResult ? <AnalysisPlaceholder /> :
-                !analysisResult && !documentText && !existingDocument ? (
+              {isAnalyzing && !analysisResult ? <AnalysisPlaceholder /> :
+                !documentId ? (
                   <div className="text-center text-muted-foreground py-16">
                     <p>Your analysis results will appear here once you upload and analyze a document.</p>
                   </div>
                 ) : (
                 <Tabs defaultValue="summary" className="w-full">
                   <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 bg-background">
-                    <TabsTrigger value="summary">Summary</TabsTrigger>
-                    <TabsTrigger value="entities">Key Entities</TabsTrigger>
-                    <TabsTrigger value="risks">Risk Flags</TabsTrigger>
-                    {existingDocument && <TabsTrigger value="qa">Q&A</TabsTrigger>}
+                    <TabsTrigger value="summary" disabled={!analysisResult}>Summary</TabsTrigger>
+                    <TabsTrigger value="entities" disabled={!analysisResult}>Key Entities</TabsTrigger>
+                    <TabsTrigger value="risks" disabled={!analysisResult}>Risk Flags</TabsTrigger>
+                    <TabsTrigger value="qa">Q&A</TabsTrigger>
                   </TabsList>
                   {analysisResult ? (
                     <>
@@ -369,21 +376,19 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
                       <TabsContent value="risks">
                         <RisksDisplay risks={analysisResult.risks.riskyClauses} />
                       </TabsContent>
-                      {existingDocument && (
-                        <TabsContent value="qa">
-                          <QAChat documentId={existingDocument.id} documentText={documentText} />
-                        </TabsContent>
-                      )}
                     </>
                   ) : (
                     <div className="text-center text-muted-foreground py-16">
-                        {isLoading ? (
+                        {isAnalyzing ? (
                             <AnalysisPlaceholder />
-                        ) : (
+                        ) : documentId && !analysisResult ? (
                              <p>Click "Analyze Document" to see the results.</p>
-                        )}
+                        ) : null}
                     </div>
                   )}
+                  <TabsContent value="qa">
+                    <QAChat documentId={documentId!} documentText={documentText} />
+                  </TabsContent>
                 </Tabs>
               )}
             </CardContent>
@@ -394,5 +399,3 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
     </>
   );
 }
-
-    

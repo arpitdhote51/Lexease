@@ -38,6 +38,8 @@ export type AuthFormValues = z.infer<typeof authSchema>;
 
 export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [isSigningUp, setIsSigningUp] = useState(false);
   const [showResend, setShowResend] = useState(false);
   const { signIn, signUp, sendPasswordReset, resendVerificationEmail } = useAuth();
   const router = useRouter();
@@ -53,6 +55,7 @@ export default function AuthPage() {
 
   const handleSignIn = async (data: AuthFormValues) => {
     setIsLoading(true);
+    setIsSigningIn(true);
     setShowResend(false);
     try {
       await signIn(data);
@@ -63,11 +66,13 @@ export default function AuthPage() {
       }
     } finally {
       setIsLoading(false);
+      setIsSigningIn(false);
     }
   };
 
   const handleSignUp = async (data: AuthFormValues) => {
     setIsLoading(true);
+    setIsSigningUp(true);
     try {
       await signUp(data);
       form.reset();
@@ -79,6 +84,7 @@ export default function AuthPage() {
       // Error is handled in useAuth hook
     } finally {
       setIsLoading(false);
+      setIsSigningUp(false);
     }
   };
 
@@ -105,7 +111,7 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4">
+    <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-background">
       <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[400px]">
         <div className="flex flex-col space-y-2 text-center">
             <h1 className="text-3xl font-bold text-primary">
@@ -116,12 +122,12 @@ export default function AuthPage() {
             </p>
         </div>
         <Tabs defaultValue="signin" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 bg-background">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="signin">Sign In</TabsTrigger>
             <TabsTrigger value="signup">Sign Up</TabsTrigger>
           </TabsList>
           <TabsContent value="signin">
-            <Card className="bg-white shadow-lg border-border">
+            <Card className="bg-card border-border shadow-md">
               <CardHeader>
                 <CardTitle className="text-foreground">Sign In</CardTitle>
                 <CardDescription>
@@ -200,7 +206,7 @@ export default function AuthPage() {
                     )}
                    
                     <Button type="submit" className="w-full bg-accent text-white font-semibold py-3 rounded-lg hover:bg-accent/90" disabled={isLoading}>
-                      {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {isSigningIn && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Sign In
                     </Button>
                   </form>
@@ -209,7 +215,7 @@ export default function AuthPage() {
             </Card>
           </TabsContent>
           <TabsContent value="signup">
-            <Card className="bg-white shadow-lg border-border">
+            <Card className="bg-card border-border shadow-md">
               <CardHeader>
                 <CardTitle className="text-foreground">Sign Up</CardTitle>
                 <CardDescription>
@@ -260,7 +266,7 @@ export default function AuthPage() {
                       )}
                     />
                     <Button type="submit" className="w-full bg-accent text-white font-semibold py-3 rounded-lg hover:bg-accent/90" disabled={isLoading}>
-                      {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {isSigningUp && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Sign Up
                     </Button>
                   </form>

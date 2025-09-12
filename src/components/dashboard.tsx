@@ -1,15 +1,14 @@
-
 "use client";
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { Button } from "./ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card";
-import { Loader2, PlusCircle, FileText, CheckCircle, AlertTriangle } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
-import LexeaseLayout from "./layout/lexease-layout";
+import Link from "next/link";
 
 export type DocumentData = {
   id: string;
@@ -26,10 +25,10 @@ export type DocumentData = {
 
 function DocumentCard({ doc, onSelect }: { doc: DocumentData, onSelect: (doc: DocumentData) => void }) {
   const analysisComplete = !!doc.analysis;
+  const cardStyles = "bg-white p-5 rounded-xl border border-border transition-all duration-300 hover:shadow-lg hover:-translate-y-1 cursor-pointer";
+  
   return (
-    <div 
-        onClick={() => onSelect(doc)}
-        className="bg-white p-5 rounded-xl border border-border transition-all duration-300 hover:shadow-lg hover:-translate-y-1 cursor-pointer">
+    <div onClick={() => onSelect(doc)} className={cardStyles}>
       <div className="flex items-center gap-4 mb-4">
         <div className="p-3 bg-background rounded-lg">
           <span className="material-symbols-outlined text-primary">description</span>
@@ -42,7 +41,10 @@ function DocumentCard({ doc, onSelect }: { doc: DocumentData, onSelect: (doc: Do
         </div>
       </div>
       <div className="h-2 bg-background rounded-full mb-3">
-        <div className={`h-2 ${analysisComplete ? 'bg-accent' : 'bg-yellow-400'} rounded-full`} style={{ width: analysisComplete ? '100%' : '60%' }}></div>
+        <div 
+          className={`h-2 ${analysisComplete ? 'bg-accent' : 'bg-yellow-400'} rounded-full`} 
+          style={{ width: analysisComplete ? '100%' : '60%' }}
+        ></div>
       </div>
       <p className="text-xs text-center text-muted-foreground">{analysisComplete ? 'Analysis Complete' : 'Analysis in Progress...'}</p>
     </div>
@@ -53,7 +55,7 @@ function UploadNewCard({ onClick }: { onClick: () => void }) {
   return (
     <div
       onClick={onClick}
-      className="flex items-center justify-center bg-transparent border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:bg-white hover:border-accent hover:text-accent transition-colors cursor-pointer min-h-[140px]"
+      className="flex items-center justify-center bg-transparent border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:bg-white hover:border-accent hover:text-accent transition-colors cursor-pointer min-h-[164px]"
     >
       <div className="text-center">
         <span className="material-symbols-outlined text-4xl">add_circle</span>
@@ -63,7 +65,6 @@ function UploadNewCard({ onClick }: { onClick: () => void }) {
   );
 }
 
-
 export default function Dashboard() {
   const { user } = useAuth();
   const router = useRouter();
@@ -72,7 +73,10 @@ export default function Dashboard() {
 
   useEffect(() => {
     const fetchDocuments = async () => {
-      if (!user) return;
+      if (!user) {
+        setIsLoading(false);
+        return;
+      };
       setIsLoading(true);
       try {
         const q = query(
@@ -92,9 +96,7 @@ export default function Dashboard() {
       }
     };
 
-    if (user) {
-      fetchDocuments();
-    }
+    fetchDocuments();
   }, [user]);
 
   const handleNewAnalysis = () => {
@@ -106,13 +108,12 @@ export default function Dashboard() {
   };
 
   const recentDocuments = documents.slice(0, 3);
-  const keyInsights = documents.filter(d => d.analysis).slice(0, 2);
+  const keyInsights = documents.filter(d => d.analysis && d.analysis.summary).slice(0, 2);
   const flaggedRisks = documents
     .filter(d => d.analysis && d.analysis.risks && d.analysis.risks.riskyClauses.length > 0)
     .slice(0, 2);
 
   return (
-    <LexeaseLayout>
       <main className="flex-1 p-10 overflow-y-auto">
         <header className="flex justify-between items-center mb-10">
           <div>
@@ -134,7 +135,7 @@ export default function Dashboard() {
             <section>
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-foreground">Recently Uploaded Documents</h2>
-                <a className="text-accent font-semibold hover:underline" href="#">View all</a>
+                <Link href="/documents" className="text-accent font-semibold hover:underline">View all</Link>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                 {recentDocuments.map(doc => (
@@ -148,7 +149,7 @@ export default function Dashboard() {
               <section>
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-2xl font-bold text-foreground">Key Insights</h2>
-                  <a className="text-accent font-semibold hover:underline" href="#">View all</a>
+                   <Link href="/documents" className="text-accent font-semibold hover:underline">View all</Link>
                 </div>
                 <div className="space-y-4">
                   {keyInsights.length > 0 ? keyInsights.map(doc => (
@@ -169,7 +170,7 @@ export default function Dashboard() {
               <section>
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-2xl font-bold text-foreground">Flagged Risks</h2>
-                  <a className="text-accent font-semibold hover:underline" href="#">View all</a>
+                   <Link href="/documents" className="text-accent font-semibold hover:underline">View all</Link>
                 </div>
                  <div className="space-y-4">
                   {flaggedRisks.length > 0 ? flaggedRisks.flatMap(doc => 
@@ -192,6 +193,5 @@ export default function Dashboard() {
           </div>
         )}
       </main>
-    </LexeaseLayout>
   );
 }
