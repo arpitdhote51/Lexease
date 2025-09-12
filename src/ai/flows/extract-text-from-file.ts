@@ -36,18 +36,6 @@ export async function extractTextFromFile(
   return extractTextFromFileFlow(input);
 }
 
-const ocrPrompt = ai.definePrompt({
-  name: 'ocrPrompt',
-  input: {
-    schema: z.object({
-      fileDataUri: z.string(),
-    }),
-  },
-  prompt: `Extract the text content from the following document.
-  {{media url=fileDataUri}}
-  `,
-});
-
 const extractTextFromFileFlow = ai.defineFlow(
   {
     name: 'extractTextFromFileFlow',
@@ -66,12 +54,10 @@ const extractTextFromFileFlow = ai.defineFlow(
       // Use AI for OCR on all PDFs and images.
       console.log(`Using AI OCR for file type: ${fileType}`);
       const {text: ocrText} = await ai.generate({
-        prompt: `Extract all text from this document image.`,
-        input: {
-          document: {
-            url: fileDataUri,
-          },
-        },
+        prompt: [
+            {text: 'Extract all text from this document.'},
+            {media: {url: fileDataUri}}
+        ],
       });
       text = ocrText;
 
@@ -87,8 +73,14 @@ const extractTextFromFileFlow = ai.defineFlow(
       // Handle plain text files
       text = buffer.toString('utf-8');
     } else {
-      console.log(`Unsupported file type: ${fileType}.`);
-      text = '';
+      console.log(`Unsupported file type: ${fileType}. Falling back to AI OCR.`);
+      const {text: ocrText} = await ai.generate({
+        prompt: [
+            {text: 'Extract all text from this document.'},
+            {media: {url: fileDataUri}}
+        ],
+      });
+      text = ocrText;
     }
 
     return {text};
