@@ -129,6 +129,11 @@ const documentAnalysisFlow = ai.defineFlow(
 
     const documentText = docSnap.data().documentText;
 
+    if (!documentText) {
+      console.log(`Document ${documentId} has no text to analyze. Skipping.`);
+      return;
+    }
+
     // Run all analysis tasks in parallel
     const [summaryResult, entitiesResult, risksResult] = await Promise.all([
       summaryPrompt({documentText, userRole}),
