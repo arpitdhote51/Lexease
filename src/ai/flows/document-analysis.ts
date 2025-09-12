@@ -2,10 +2,10 @@
 
 /**
  * @fileOverview A Genkit flow that performs a comprehensive analysis of a legal document.
- * This file is updated to run analysis in the background and update Firestore incrementally.
+ * This file is updated to run analysis in the background and update Firestore in a single operation.
  *
  * - analyzeDocumentInBackground - A function that takes a document ID and user role,
- *   runs the analysis, and updates Firestore with partial results.
+ *   runs the analysis, and updates Firestore with the complete results.
  * - DocumentAnalysisInput - The input type for the analysis function.
  * - DocumentAnalysisOutput - The return type for the analysis function.
  */
@@ -129,17 +129,21 @@ const documentAnalysisFlow = ai.defineFlow(
 
     const documentText = docSnap.data().documentText;
 
-    // We don't await these. We let them run and update the db independently.
-    summaryPrompt({documentText, userRole}).then(async ({output}) => {
-      if (output) await updateDoc(docRef, {'analysis.summary': output});
-    });
+    // Run all analysis tasks in parallel
+    const [summaryResult, entitiesResult, risksResult] = await Promise.all([
+      summaryPrompt({documentText, userRole}),
+      entitiesPrompt({documentText}),
+      risksPrompt({documentText}),
+    ]);
 
-    entitiesPrompt({documentText}).then(async ({output}) => {
-      if (output) await updateDoc(docRef, {'analysis.entities': output});
-    });
+    const analysis: Partial<DocumentAnalysisOutput> = {};
+    if (summaryResult.output) analysis.summary = summaryResult.output;
+    if (entitiesResult.output) analysis.entities = entitiesResult.output;
+    if (risksResult.output) analysis.risks = risksResult.output;
 
-    risksPrompt({documentText}).then(async ({output}) => {
-      if (output) await updateDoc(docRef, {'analysis.risks': output});
-    });
+    // Perform a single update to Firestore with all the results
+    if (Object.keys(analysis).length > 0) {
+      await updateDoc(docRef, {analysis});
+    }
   }
 );
