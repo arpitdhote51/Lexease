@@ -66,12 +66,13 @@ function UploadNewCard({ onClick }: { onClick: () => void }) {
 }
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [documents, setDocuments] = useState<DocumentData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return; // Wait until auth state is confirmed
     if (!user) return; // Don't fetch if no user
 
     const fetchDocuments = async () => {
@@ -83,10 +84,10 @@ export default function Dashboard() {
           orderBy("createdAt", "desc")
         );
         const querySnapshot = await getDocs(q);
-        const docs = querySnapshot.docs.map(
+        const docsData = querySnapshot.docs.map(
           (doc) => ({ id: doc.id, ...doc.data() } as DocumentData)
         );
-        setDocuments(docs);
+        setDocuments(docsData);
       } catch (error) {
         console.error("Error fetching documents: ", error);
       } finally {
@@ -95,7 +96,7 @@ export default function Dashboard() {
     };
 
     fetchDocuments();
-  }, [user]);
+  }, [user, authLoading]);
 
   const handleNewAnalysis = () => {
     router.push("/new");
@@ -105,6 +106,7 @@ export default function Dashboard() {
     router.push(`/${doc.id}`);
   };
 
+  // Filter documents on the client-side
   const recentDocuments = documents.slice(0, 3);
   const keyInsights = documents.filter(d => d.analysis && d.analysis.summary).slice(0, 2);
   const flaggedRisks = documents
@@ -118,15 +120,10 @@ export default function Dashboard() {
             <h1 className="text-3xl font-bold text-primary">Dashboard</h1>
             <p className="text-muted-foreground mt-1">Welcome back! Here's an overview of your legal documents.</p>
           </div>
-          <div className="flex items-center gap-4">
-            <Button onClick={() => router.push('/consult')} variant="outline" className="font-semibold py-2.5 px-6 rounded-lg transition-colors shadow-sm">
-              Consult with a Lawyer
-            </Button>
-            <Button onClick={handleNewAnalysis} className="bg-accent text-white font-semibold py-2.5 px-6 rounded-lg hover:bg-accent/90 transition-colors flex items-center gap-2 shadow-sm">
-              <span className="material-symbols-outlined">upload_file</span>
-              Upload Document
-            </Button>
-          </div>
+          <Button onClick={handleNewAnalysis} className="bg-accent text-white font-semibold py-2.5 px-6 rounded-lg hover:bg-accent/90 transition-colors flex items-center gap-2 shadow-sm">
+            <span className="material-symbols-outlined">upload_file</span>
+            Upload Document
+          </Button>
         </header>
 
         {isLoading ? (
@@ -198,4 +195,3 @@ export default function Dashboard() {
       </main>
   );
 }
-    

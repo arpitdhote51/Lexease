@@ -1,6 +1,6 @@
 "use client";
 import { useState, useCallback, useEffect } from "react";
-import { Loader2, FileUp, File as FileIcon, X } from "lucide-react";
+import { Loader2, FileUp, FileIcon, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -10,23 +10,20 @@ import { useToast } from "@/hooks/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 import mammoth from 'mammoth';
 import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp, doc, setDoc, updateDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 
 import {
   plainLanguageSummarization,
-  PlainLanguageSummarizationInput,
   PlainLanguageSummarizationOutput,
 } from "@/ai/flows/plain-language-summarization";
 import {
   identifyKeyEntities,
-  KeyEntityRecognitionInput,
   KeyEntityRecognitionOutput,
 } from "@/ai/flows/key-entity-recognition";
 import {
   riskFlagging,
-  RiskFlaggingInput,
   RiskFlaggingOutput,
 } from "@/ai/flows/risk-flagging";
 
@@ -107,7 +104,6 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
     setAnalysisResult(null); // Clear previous analysis
 
     try {
-        let text = '';
         if (file.type === 'application/pdf') {
             const reader = new FileReader();
             reader.onload = async (e) => {
@@ -120,7 +116,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
                         const textContent = await page.getTextContent();
                         fullText += textContent.items.map(item => (item as any).str).join(' ');
                     }
-                    saveInitialDocument(file.name, fullText);
+                    await saveInitialDocument(file.name, fullText);
                 } catch (pdfError) {
                     handleFileError(pdfError, "PDF");
                 }
@@ -132,7 +128,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
                 try {
                     const arrayBuffer = e.target?.result as ArrayBuffer;
                     const result = await mammoth.extractRawText({ arrayBuffer });
-                    saveInitialDocument(file.name, result.value);
+                    await saveInitialDocument(file.name, result.value);
                 } catch (docxError) {
                     handleFileError(docxError, "DOCX");
                 }
@@ -140,8 +136,8 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
             reader.readAsArrayBuffer(file);
         } else if (file.type === 'text/plain') {
             const reader = new FileReader();
-            reader.onload = (e) => {
-                saveInitialDocument(file.name, e.target?.result as string);
+            reader.onload = async (e) => {
+                await saveInitialDocument(file.name, e.target?.result as string);
             };
             reader.readAsText(file);
         } else {
@@ -241,6 +237,10 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
   }, []);
 
   const isLoading = isProcessing || isAnalyzing;
+
+  const handleStartNew = () => {
+    router.push('/new');
+  };
 
   return (
     <>
@@ -348,13 +348,20 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
         )}
         <div className={initialDocument ? "lg:col-span-12" : "lg:col-span-7"}>
           <Card className="bg-white shadow-none border-border">
-            <CardHeader>
-              <CardTitle className="font-bold text-2xl text-foreground">
-                { file ? file.name : "Analysis Results" }
-                </CardTitle>
-              <CardDescription>
-                { file ? "Viewing analysis for your document." : "Here is a breakdown of your legal document." }
-              </CardDescription>
+            <CardHeader className="flex flex-row justify-between items-center">
+              <div>
+                <CardTitle className="font-bold text-2xl text-foreground">
+                  { file ? file.name : "Analysis Results" }
+                  </CardTitle>
+                <CardDescription>
+                  { file ? "Viewing analysis for your document." : "Here is a breakdown of your legal document." }
+                </CardDescription>
+              </div>
+              {documentId && (
+                <Button onClick={handleStartNew} variant="outline">
+                  Start New Analysis
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               {isAnalyzing && !analysisResult ? <AnalysisPlaceholder /> :
@@ -404,4 +411,3 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
     </>
   );
 }
-    
