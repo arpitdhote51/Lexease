@@ -9,13 +9,8 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.js';
 import mammoth from 'mammoth';
-
-// Set the workerSrc to avoid issues in Node.js environment
-// @ts-ignore
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/legacy/build/pdf.worker.min.js`;
-
+import pdf from 'pdf-parse';
 
 const ExtractTextFromFileInputSchema = z.object({
   fileDataUri: z
@@ -52,15 +47,8 @@ const extractTextFromFileFlow = ai.defineFlow(
     let text = '';
 
     if (fileType === 'application/pdf') {
-      const typedArray = new Uint8Array(buffer);
-      const pdf = await pdfjs.getDocument(typedArray).promise;
-      let fullText = '';
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        fullText += textContent.items.map((item: any) => item.str).join(' ');
-      }
-      text = fullText.trim();
+      const data = await pdf(buffer);
+      text = data.text;
 
       // If text is empty, it might be a scanned PDF. Use OCR.
       if (!text) {
