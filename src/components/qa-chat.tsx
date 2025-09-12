@@ -108,8 +108,8 @@ export default function QAChat({ documentText, documentId }: QAChatProps) {
             title: "Error",
             description: "Could not get an answer. Please try again."
         });
-        // Remove the optimistic user message if the API call fails
-        setMessages(prev => prev.filter(msg => msg.content !== userMessage.content));
+        // This is a simplified rollback. For a real-world app, you might want a more robust solution.
+        setMessages(prev => prev.filter(msg => msg.content !== userMessage.content || msg.role !== 'user' ));
     } finally {
         setIsLoading(false);
     }
