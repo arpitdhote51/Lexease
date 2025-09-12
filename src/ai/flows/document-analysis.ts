@@ -22,6 +22,11 @@ const DocumentAnalysisInputSchema = z.object({
     .describe(
       'The role of the user, which affects the complexity of the summary. Options are lawyer, lawStudent, and layperson.'
     ),
+  fileDataUri: z
+    .string()
+    .describe(
+      "The file to analyze, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+    ),
 });
 export type DocumentAnalysisInput = z.infer<typeof DocumentAnalysisInputSchema>;
 
@@ -70,16 +75,15 @@ const summaryPrompt = ai.definePrompt({
   name: 'summaryPrompt',
   input: {
     schema: z.object({
-      documentText: z.string(),
+      fileDataUri: z.string(),
       userRole: z.enum(['lawyer', 'lawStudent', 'layperson']),
     }),
   },
   output: {schema: DocumentAnalysisOutputSchema.shape.summary},
-  prompt: `You are an AI legal assistant. Summarize the provided legal document into plain, easy-to-understand language. The summary's complexity should be tailored to the user's role.
+  prompt: `You are an AI legal assistant. Analyze the provided document and summarize it into plain, easy-to-understand language. The summary's complexity should be tailored to the user's role.
 
   User Role: {{{userRole}}}
-  Legal Document:
-  {{{documentText}}}
+  Legal Document: {{media url=fileDataUri}}
 
   Please provide only the summary in the structured JSON format.
   `,
@@ -88,12 +92,11 @@ const summaryPrompt = ai.definePrompt({
 // Prompt for Entity Extraction
 const entitiesPrompt = ai.definePrompt({
   name: 'entitiesPrompt',
-  input: {schema: z.object({documentText: z.string()})},
+  input: {schema: z.object({fileDataUri: z.string()})},
   output: {schema: DocumentAnalysisOutputSchema.shape.entities},
-  prompt: `You are an AI legal assistant. Identify and extract key entities from the provided legal document, including parties, dates, locations, and monetary amounts.
+  prompt: `You are an AI legal assistant. Analyze the provided document and extract key entities, including parties, dates, locations, and monetary amounts.
 
-  Legal Document:
-  {{{documentText}}}
+  Legal Document: {{media url=fileDataUri}}
 
   Please provide only the list of key entities in the structured JSON format.
   `,
@@ -102,12 +105,11 @@ const entitiesPrompt = ai.definePrompt({
 // Prompt for Risk Flagging
 const risksPrompt = ai.definePrompt({
   name: 'risksPrompt',
-  input: {schema: z.object({documentText: z.string()})},
+  input: {schema: z.object({fileDataUri: z.string()})},
   output: {schema: DocumentAnalysisOutputSchema.shape.risks},
-  prompt: `You are an AI legal assistant. Analyze the provided legal document and flag any clauses that appear risky, unusual, or potentially problematic.
+  prompt: `You are an AI legal assistant. Analyze the provided document and flag any clauses that appear risky, unusual, or potentially problematic.
 
-  Legal Document:
-  {{{documentText}}}
+  Legal Document: {{media url=fileDataUri}}
 
   Please provide only the list of risky clauses in the structured JSON format.
   `,
@@ -119,26 +121,14 @@ const documentAnalysisFlow = ai.defineFlow(
     inputSchema: DocumentAnalysisInputSchema,
     outputSchema: z.void(),
   },
-  async ({documentId, userRole}) => {
+  async ({documentId, userRole, fileDataUri}) => {
     const docRef = doc(db, 'documents', documentId);
-    const docSnap = await getDoc(docRef);
-
-    if (!docSnap.exists()) {
-      throw new Error(`Document with ID ${documentId} not found.`);
-    }
-
-    const documentText = docSnap.data().documentText;
-
-    if (!documentText) {
-      console.log(`Document ${documentId} has no text to analyze. Skipping.`);
-      return;
-    }
 
     // Run all analysis tasks in parallel
     const [summaryResult, entitiesResult, risksResult] = await Promise.all([
-      summaryPrompt({documentText, userRole}),
-      entitiesPrompt({documentText}),
-      risksPrompt({documentText}),
+      summaryPrompt({fileDataUri, userRole}),
+      entitiesPrompt({fileDataUri}),
+      risksPrompt({fileDataUri}),
     ]);
 
     const analysis: Partial<DocumentAnalysisOutput> = {};

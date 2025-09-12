@@ -17,11 +17,6 @@ import {
   DocumentAnalysisOutput,
 } from "@/ai/flows/document-analysis";
 
-import {
-    extractTextFromFile
-} from "@/ai/flows/extract-text-from-file";
-
-
 import SummaryDisplay from "./summary-display";
 import EntitiesDisplay from "./entities-display";
 import RisksDisplay from "./risks-display";
@@ -102,8 +97,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
         reader.onload = async (e) => {
             try {
                 const dataUri = e.target?.result as string;
-                const result = await extractTextFromFile({ fileDataUri: dataUri, fileType: file.type });
-                await saveInitialDocumentAndAnalyze(file.name, result.text);
+                await saveInitialDocumentAndAnalyze(file.name, dataUri);
             } catch (error) {
                 handleFileError(error, file.type);
             }
@@ -121,15 +115,13 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
     setIsProcessing(false);
   }
 
-  const saveInitialDocumentAndAnalyze = async (fileName: string, text: string) => {
+  const saveInitialDocumentAndAnalyze = async (fileName: string, dataUri: string) => {
     if (!user) return;
-    setDocumentText(text);
-
+    
     try {
         const newDocRef = await addDoc(collection(db, 'documents'), {
             userId: user.uid,
             fileName: fileName,
-            documentText: text,
             createdAt: serverTimestamp(),
             analysis: {}, // Initialize with empty object
         });
@@ -138,7 +130,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
         router.push(`/${newDocRef.id}`, { scroll: false }); 
 
         // Start analysis in the background
-        handleAnalyze(newDocRef.id, false);
+        handleAnalyze(newDocRef.id, dataUri, false);
     } catch (error) {
         console.error("Failed to save initial document:", error);
         toast({ variant: "destructive", title: "Save Failed", description: "Could not save the document to the database." });
@@ -146,7 +138,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
     }
   };
 
-  const handleAnalyze = async (docId: string, forceReanalysis = false) => {
+  const handleAnalyze = async (docId: string, fileDataUri: string, forceReanalysis = false) => {
     if (!docId) {
       toast({ variant: "destructive", title: "Error", description: "No document ID available to analyze." });
       return;
@@ -165,7 +157,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
     }
     toast({ title: "Analysis Started", description: "Your document analysis is running in the background. Results will appear here shortly." });
 
-    analyzeDocumentInBackground({ documentId: docId, userRole })
+    analyzeDocumentInBackground({ documentId: docId, userRole, fileDataUri })
         .catch((error) => {
             console.error("Analysis failed to start:", error);
             toast({ variant: "destructive", title: "Analysis Failed", description: "An error occurred while starting the analysis." });
@@ -291,23 +283,6 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
                   { file ? "Viewing analysis for your document." : "Here is a breakdown of your legal document." }
                 </CardDescription>
               </div>
-              {documentId && (
-                 <div className="flex items-center gap-2">
-                    {initialDocument && (
-                         <Button onClick={handleStartNew} variant="outline">
-                            Start New Analysis
-                        </Button>
-                    )}
-                    <Button onClick={() => handleAnalyze(documentId, true)} disabled={isAnalyzing} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-accent/90">
-                        {isAnalyzing ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Analyzing...
-                          </>
-                        ) : "Re-Analyze" }
-                    </Button>
-                 </div>
-              )}
             </CardHeader>
             <CardContent>
               {!documentId ? (
