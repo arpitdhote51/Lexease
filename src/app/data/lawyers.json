@@ -1,0 +1,70 @@
+{
+  "lawyers": [
+    {
+      "id": "1",
+      "name": "Priya Sharma",
+      "designation": "Senior Partner",
+      "experience": 15,
+      "specializations": ["Contract Law", "Corporate Law"],
+      "rating": 4.9,
+      "testimonial": "Priya's expertise in contract negotiation is unmatched. Highly recommended.",
+      "location": "Mumbai, India",
+      "avatarUrl": "https://picsum.photos/seed/lawyer1/200/200"
+    },
+    {
+      "id": "2",
+      "name": "Arjun Singh",
+      "designation": "Associate Attorney",
+      "experience": 8,
+      "specializations": ["Property Law", "Real Estate"],
+      "rating": 4.8,
+      "testimonial": "Arjun helped me navigate a complex property dispute with ease.",
+      "location": "Delhi, India",
+      "avatarUrl": "https://picsum.photos/seed/lawyer2/200/200"
+    },
+    {
+      "id": "3",
+      "name": "Ananya Reddy",
+      "designation": "Founder & Principal",
+      "experience": 20,
+      "specializations": ["Intellectual Property", "Startup Law"],
+      "rating": 5.0,
+      "testimonial": "Ananya is a lifesaver for any tech startup.",
+      "location": "Bangalore, India",
+      "avatarUrl": "https://picsum.photos/seed/lawyer3/200/200"
+    },
+    {
+      "id": "4",
+      "name": "Vikram Desai",
+      "designation": "Litigation Head",
+      "experience": 12,
+      "specializations": ["Civil Litigation", "Family Law"],
+      "rating": 4.7,
+      "testimonial": "Vikram is a fierce and dedicated litigator.",
+      "location": "Pune, India",
+      "avatarUrl": "https://picsum.photos/seed/lawyer4/200/200"
+    },
+    {
+      "id": "5",
+      "name": "Meera Krishnan",
+      "designation": "Tax Law Specialist",
+      "experience": 18,
+      "specializations": ["Tax Law", "Wealth Management"],
+      "rating": 4.9,
+      "testimonial": "Meera's understanding of tax regulations is exceptional.",
+      "location": "Chennai, India",
+      "avatarUrl": "https://picsum.photos/seed/lawyer5/200/200"
+    },
+    {
+      "id": "6",
+      "name": "Rohan Gupta",
+      "designation": "Cyber Law Consultant",
+      "experience": 7,
+      "specializations": ["Cybersecurity Law", "Data Privacy"],
+      "rating": 4.8,
+      "testimonial": "Rohan is the go-to expert for all things cyber law.",
+      "location": "Hyderabad, India",
+      "avatarUrl": "https://picsum.photos/seed/lawyer6/200/200"
+    }
+  ]
+}
