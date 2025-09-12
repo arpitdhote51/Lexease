@@ -43,7 +43,7 @@ const mockUser = {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   // Set to true to enable Firebase authentication
-  const authEnabled = false; 
+  const authEnabled = true; 
 
   const [user, setUser] = useState<User | null>(authEnabled ? null : mockUser as unknown as User);
   const [loading, setLoading] = useState(authEnabled);
