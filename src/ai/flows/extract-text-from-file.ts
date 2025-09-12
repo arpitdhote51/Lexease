@@ -9,7 +9,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.js';
+import * as pdfjs from 'pdfjs-dist';
 import mammoth from 'mammoth';
 
 const ExtractTextFromFileInputSchema = z.object({
