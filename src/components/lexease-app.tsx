@@ -77,7 +77,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
         });
       }
       if(initialDocument.fileName) {
-        setFile(new File([], initialDocument.fileName));
+        setFile(new global.File([], initialDocument.fileName));
       }
     } else {
         setExistingDocument(null);
@@ -190,27 +190,32 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
     }
 
     setIsAnalyzing(true);
-    setAnalysisResult(null);
+    setAnalysisResult(null); // Clear previous results while analyzing
+    toast({ title: "Analysis Started", description: "Your document analysis is running in the background. Results will appear here shortly." });
 
-    try {
-      const [summary, entities, risks] = await Promise.all([
-        plainLanguageSummarization({ legalDocumentText: documentText, userRole }),
-        identifyKeyEntities({ documentText: documentText }),
-        riskFlagging({ legalText: documentText }),
-      ]);
-      
-      const results = { summary, entities, risks };
-      setAnalysisResult(results);
+    // Non-blocking analysis
+    Promise.all([
+      plainLanguageSummarization({ legalDocumentText: documentText, userRole }),
+      identifyKeyEntities({ documentText: documentText }),
+      riskFlagging({ legalText: documentText }),
+    ]).then(async ([summary, entities, risks]) => {
+        const results = { summary, entities, risks };
+        
+        // Update state to show results in UI
+        setAnalysisResult(results);
 
-      const docRef = doc(db, 'documents', documentId);
-      await updateDoc(docRef, { analysis: results });
+        // Save results to Firestore
+        const docRef = doc(db, 'documents', documentId);
+        await updateDoc(docRef, { analysis: results });
 
-    } catch (error) {
-      console.error("Analysis failed:", error);
-      toast({ variant: "destructive", title: "Analysis Failed", description: "An error occurred while analyzing the document." });
-    } finally {
-      setIsAnalyzing(false);
-    }
+        setIsAnalyzing(false);
+        toast({ title: "Analysis Complete", description: "Your document analysis has finished." });
+      })
+      .catch((error) => {
+        console.error("Analysis failed:", error);
+        toast({ variant: "destructive", title: "Analysis Failed", description: "An error occurred while analyzing the document." });
+        setIsAnalyzing(false);
+      });
   };
   
   const AnalysisPlaceholder = () => (
@@ -363,7 +368,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
                     <TabsTrigger value="summary" disabled={!analysisResult}>Summary</TabsTrigger>
                     <TabsTrigger value="entities" disabled={!analysisResult}>Key Entities</TabsTrigger>
                     <TabsTrigger value="risks" disabled={!analysisResult}>Risk Flags</TabsTrigger>
-                    <TabsTrigger value="qa">Q&A</TabsTrigger>
+                    <TabsTrigger value="qa" disabled={!documentId}>Q&A</TabsTrigger>
                   </TabsList>
                   {analysisResult ? (
                     <>
@@ -387,7 +392,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
                     </div>
                   )}
                   <TabsContent value="qa">
-                    <QAChat documentId={documentId!} documentText={documentText} />
+                    {documentId && <QAChat documentId={documentId} documentText={documentText} />}
                   </TabsContent>
                 </Tabs>
               )}
@@ -399,3 +404,4 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
     </>
   );
 }
+    

@@ -72,11 +72,9 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (!user) return; // Don't fetch if no user
+
     const fetchDocuments = async () => {
-      if (!user) {
-        setIsLoading(false);
-        return;
-      };
       setIsLoading(true);
       try {
         const q = query(
@@ -121,6 +119,9 @@ export default function Dashboard() {
             <p className="text-muted-foreground mt-1">Welcome back! Here's an overview of your legal documents.</p>
           </div>
           <div className="flex items-center gap-4">
+            <Button onClick={() => router.push('/consult')} variant="outline" className="font-semibold py-2.5 px-6 rounded-lg transition-colors shadow-sm">
+              Consult with a Lawyer
+            </Button>
             <Button onClick={handleNewAnalysis} className="bg-accent text-white font-semibold py-2.5 px-6 rounded-lg hover:bg-accent/90 transition-colors flex items-center gap-2 shadow-sm">
               <span className="material-symbols-outlined">upload_file</span>
               Upload Document
@@ -197,3 +198,4 @@ export default function Dashboard() {
       </main>
   );
 }
+    
