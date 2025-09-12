@@ -1,7 +1,7 @@
 
 "use client";
 import { useState, useCallback, useEffect } from "react";
-import { Loader2, FileUp, File, X, ArrowLeft } from "lucide-react";
+import { Loader2, FileUp, File as FileIcon, X, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -266,7 +266,7 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
                 />
                 {file ? (
                     <div className="text-center p-4">
-                        <File className="mx-auto h-12 w-12 text-muted-foreground" />
+                        <FileIcon className="mx-auto h-12 w-12 text-muted-foreground" />
                         <p className="mt-2 font-semibold truncate">{file.name}</p>
                          {!existingDocument && (
                             <Button
