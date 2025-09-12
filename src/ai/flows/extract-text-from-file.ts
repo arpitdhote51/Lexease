@@ -66,6 +66,7 @@ const extractTextFromFileFlow = ai.defineFlow(
       if (!text) {
         console.log('PDF text is empty, attempting OCR with Gemini.');
         const {text: ocrText} = await ai.generate({
+          model: 'googleai/gemini-2.5-flash',
           prompt: [
             {text: 'Extract all text from the following document image.'},
             {media: {url: fileDataUri}},
@@ -86,6 +87,7 @@ const extractTextFromFileFlow = ai.defineFlow(
     } else if (fileType.startsWith('image/')) {
        console.log('Image file detected, attempting OCR with Gemini.');
        const {text: ocrText} = await ai.generate({
+          model: 'googleai/gemini-2.5-flash',
           prompt: [
             {text: 'Extract all text from the following document image.'},
             {media: {url: fileDataUri}},

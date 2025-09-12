@@ -1,11 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { KeyEntityRecognitionOutput } from "@/ai/flows/key-entity-recognition";
+import { KeyEntity } from "@/ai/flows/document-analysis";
 import { Users, Calendar, MapPin, Landmark, DollarSign, FileText } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 interface EntitiesDisplayProps {
-  entities: KeyEntityRecognitionOutput["entities"];
+  entities: KeyEntity[];
 }
 
 const entityIcons: { [key: string]: LucideIcon } = {

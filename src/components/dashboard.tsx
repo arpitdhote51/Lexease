@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { DocumentAnalysisOutput } from "@/ai/flows/document-analysis";
 
 export type DocumentData = {
   id: string;
@@ -16,11 +17,7 @@ export type DocumentData = {
   createdAt: any;
   documentText: string;
   userId?: string;
-  analysis?: {
-    summary: { plainLanguageSummary: string };
-    entities: { entities: { type: string; value: string }[] };
-    risks: { riskyClauses: string[] };
-  };
+  analysis?: DocumentAnalysisOutput;
 };
 
 function DocumentCard({ doc, onSelect }: { doc: DocumentData, onSelect: (doc: DocumentData) => void }) {
