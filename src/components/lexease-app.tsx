@@ -7,8 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import * as pdfjs from 'pdfjs-dist';
-import mammoth from 'mammoth';
 import { db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
 import { useAuth } from "@/hooks/use-auth";
@@ -26,6 +24,10 @@ import {
   riskFlagging,
   RiskFlaggingOutput,
 } from "@/ai/flows/risk-flagging";
+import {
+    extractTextFromFile
+} from "@/ai/flows/extract-text-from-file";
+
 
 import SummaryDisplay from "./summary-display";
 import EntitiesDisplay from "./entities-display";
@@ -34,8 +36,6 @@ import QAChat from "./qa-chat";
 import { Skeleton } from "./ui/skeleton";
 import type { DocumentData } from "./dashboard";
 import Header from "./layout/header";
-
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 type UserRole = "layperson" | "lawStudent" | "lawyer";
 
@@ -104,47 +104,17 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
     setAnalysisResult(null); // Clear previous analysis
 
     try {
-        if (file.type === 'application/pdf') {
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                try {
-                    const typedArray = new Uint8Array(e.target?.result as ArrayBuffer);
-                    const pdf = await pdfjs.getDocument(typedArray).promise;
-                    let fullText = '';
-                    for (let i = 1; i <= pdf.numPages; i++) {
-                        const page = await pdf.getPage(i);
-                        const textContent = await page.getTextContent();
-                        fullText += textContent.items.map(item => (item as any).str).join(' ');
-                    }
-                    await saveInitialDocument(file.name, fullText);
-                } catch (pdfError) {
-                    handleFileError(pdfError, "PDF");
-                }
-            };
-            reader.readAsArrayBuffer(file);
-        } else if (file.name.endsWith('.docx')) {
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                try {
-                    const arrayBuffer = e.target?.result as ArrayBuffer;
-                    const result = await mammoth.extractRawText({ arrayBuffer });
-                    await saveInitialDocument(file.name, result.value);
-                } catch (docxError) {
-                    handleFileError(docxError, "DOCX");
-                }
-            };
-            reader.readAsArrayBuffer(file);
-        } else if (file.type === 'text/plain') {
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                await saveInitialDocument(file.name, e.target?.result as string);
-            };
-            reader.readAsText(file);
-        } else {
-            toast({ variant: 'destructive', title: 'Unsupported File Type', description: 'Please upload a PDF, DOCX, or TXT file.' });
-            setFile(null);
-            setIsProcessing(false);
-        }
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const dataUri = e.target?.result as string;
+                const result = await extractTextFromFile({ fileDataUri: dataUri, fileType: file.type });
+                await saveInitialDocument(file.name, result.text);
+            } catch (error) {
+                handleFileError(error, file.type);
+            }
+        };
+        reader.readAsDataURL(file);
     } catch (error) {
         handleFileError(error, "general");
     }
@@ -358,9 +328,19 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
                 </CardDescription>
               </div>
               {documentId && (
-                <Button onClick={handleStartNew} variant="outline">
-                  Start New Analysis
-                </Button>
+                 initialDocument ? 
+                    <Button onClick={handleStartNew} variant="outline">
+                      Start New Analysis
+                    </Button>
+                  :
+                    <Button onClick={handleAnalyze} disabled={isLoading || !documentId || !!analysisResult} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-accent/90">
+                        {isAnalyzing ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Analyzing...
+                          </>
+                        ) : analysisResult ? "Re-Analyze" : "Analyze Document" }
+                    </Button>
               )}
             </CardHeader>
             <CardContent>

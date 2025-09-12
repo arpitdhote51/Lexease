@@ -5,3 +5,4 @@ import '@/ai/flows/risk-flagging.ts';
 import '@/ai/flows/plain-language-summarization.ts';
 import '@/ai/flows/key-entity-recognition.ts';
 import '@/ai/flows/interactive-qa.ts';
+import '@/ai/flows/extract-text-from-file.ts';
