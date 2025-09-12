@@ -47,11 +47,16 @@ const extractTextFromFileFlow = ai.defineFlow(
     let text = '';
 
     if (fileType === 'application/pdf') {
-      const data = await pdf(buffer);
-      text = data.text;
+      try {
+        const data = await pdf(buffer);
+        text = data.text;
+      } catch(parseError) {
+        console.log('PDF parsing with pdf-parse failed, will attempt OCR.', parseError);
+        text = ''; // Ensure text is empty to trigger OCR
+      }
 
-      // If text is empty, it might be a scanned PDF. Use OCR.
-      if (!text) {
+      // If text is empty after attempting to parse, it might be a scanned PDF. Use OCR.
+      if (!text.trim()) {
         console.log('PDF text is empty, attempting OCR with Gemini.');
         const {text: ocrText} = await ai.generate({
           model: 'googleai/gemini-2.5-flash',
