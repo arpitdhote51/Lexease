@@ -237,7 +237,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
                     type="file"
                     className="sr-only"
                     onChange={handleFileChange}
-                    accept=".pdf,.docx,.txt"
+                    accept=".pdf,.docx,.txt,.png,.jpg,.jpeg"
                     disabled={isLoading}
                 />
                 {isProcessing ? (
@@ -273,7 +273,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
                             Drag & drop or click to upload
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                            PDF, DOCX, or TXT
+                            PDF, DOCX, TXT, PNG, or JPG
                         </p>
                     </label>
                 )}

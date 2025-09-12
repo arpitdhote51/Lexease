@@ -9,8 +9,13 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import * as pdfjs from 'pdfjs-dist';
+import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.js';
 import mammoth from 'mammoth';
+
+// Set the workerSrc to avoid issues in Node.js environment
+// @ts-ignore
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/legacy/build/pdf.worker.min.js`;
+
 
 const ExtractTextFromFileInputSchema = z.object({
   fileDataUri: z
@@ -55,7 +60,20 @@ const extractTextFromFileFlow = ai.defineFlow(
         const textContent = await page.getTextContent();
         fullText += textContent.items.map((item: any) => item.str).join(' ');
       }
-      text = fullText;
+      text = fullText.trim();
+
+      // If text is empty, it might be a scanned PDF. Use OCR.
+      if (!text) {
+        console.log('PDF text is empty, attempting OCR with Gemini.');
+        const {text: ocrText} = await ai.generate({
+          prompt: [
+            {text: 'Extract all text from the following document image.'},
+            {media: {url: fileDataUri}},
+          ],
+        });
+        text = ocrText || '';
+      }
+
     } else if (
       fileType ===
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
@@ -65,6 +83,15 @@ const extractTextFromFileFlow = ai.defineFlow(
       text = result.value;
     } else if (fileType.startsWith('text/')) {
       text = buffer.toString('utf-8');
+    } else if (fileType.startsWith('image/')) {
+       console.log('Image file detected, attempting OCR with Gemini.');
+       const {text: ocrText} = await ai.generate({
+          prompt: [
+            {text: 'Extract all text from the following document image.'},
+            {media: {url: fileDataUri}},
+          ],
+        });
+        text = ocrText || '';
     } else {
       throw new Error(`Unsupported file type: ${fileType}`);
     }
