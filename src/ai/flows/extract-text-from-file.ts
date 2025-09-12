@@ -47,27 +47,8 @@ const extractTextFromFileFlow = ai.defineFlow(
     let text = '';
 
     if (fileType === 'application/pdf') {
-      try {
-        const data = await pdf(buffer);
-        text = data.text;
-      } catch(parseError) {
-        console.log('PDF parsing with pdf-parse failed, will attempt OCR.', parseError);
-        text = ''; // Ensure text is empty to trigger OCR
-      }
-
-      // If text is empty after attempting to parse, it might be a scanned PDF. Use OCR.
-      if (!text.trim()) {
-        console.log('PDF text is empty, attempting OCR with Gemini.');
-        const {text: ocrText} = await ai.generate({
-          model: 'googleai/gemini-2.5-flash',
-          prompt: [
-            {text: 'Extract all text from the following document image.'},
-            {media: {url: fileDataUri}},
-          ],
-        });
-        text = ocrText || '';
-      }
-
+      const data = await pdf(buffer);
+      text = data.text;
     } else if (
       fileType ===
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
@@ -77,18 +58,10 @@ const extractTextFromFileFlow = ai.defineFlow(
       text = result.value;
     } else if (fileType.startsWith('text/')) {
       text = buffer.toString('utf-8');
-    } else if (fileType.startsWith('image/')) {
-       console.log('Image file detected, attempting OCR with Gemini.');
-       const {text: ocrText} = await ai.generate({
-          model: 'googleai/gemini-2.5-flash',
-          prompt: [
-            {text: 'Extract all text from the following document image.'},
-            {media: {url: fileDataUri}},
-          ],
-        });
-        text = ocrText || '';
     } else {
-      throw new Error(`Unsupported file type: ${fileType}`);
+      // We are explicitly not handling images or other file types to avoid OCR costs.
+      console.log(`Unsupported file type: ${fileType}. Only PDF, DOCX, and TXT are processed.`);
+      text = '';
     }
 
     return {text};
