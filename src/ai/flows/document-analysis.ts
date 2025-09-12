@@ -2,21 +2,21 @@
 
 /**
  * @fileOverview A Genkit flow that performs a comprehensive analysis of a legal document.
- * This file is updated to split the single analysis prompt into three smaller, more focused prompts
- * for summarization, entity extraction, and risk flagging to improve performance.
+ * This file is updated to run analysis in the background and update Firestore incrementally.
  *
- * - analyzeDocument - A function that takes legal document text and returns a full analysis.
- * - DocumentAnalysisInput - The input type for the analyzeDocument function.
- * - DocumentAnalysisOutput - The return type for the analyzeDocument function.
+ * - analyzeDocumentInBackground - A function that takes a document ID and user role,
+ *   runs the analysis, and updates Firestore with partial results.
+ * - DocumentAnalysisInput - The input type for the analysis function.
+ * - DocumentAnalysisOutput - The return type for the analysis function.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import {doc, getDoc, updateDoc} from 'firebase/firestore';
+import {db} from '@/lib/firebase';
 
 const DocumentAnalysisInputSchema = z.object({
-  documentText: z
-    .string()
-    .describe('The text of the legal document to analyze.'),
+  documentId: z.string().describe('The ID of the document in Firestore.'),
   userRole: z
     .enum(['lawyer', 'lawStudent', 'layperson'])
     .describe(
@@ -59,16 +59,21 @@ export type DocumentAnalysisOutput = z.infer<
   typeof DocumentAnalysisOutputSchema
 >;
 
-export async function analyzeDocument(
+export async function analyzeDocumentInBackground(
   input: DocumentAnalysisInput
-): Promise<DocumentAnalysisOutput> {
-  return documentAnalysisFlow(input);
+): Promise<void> {
+  await documentAnalysisFlow(input);
 }
 
 // Prompt for Summarization
 const summaryPrompt = ai.definePrompt({
   name: 'summaryPrompt',
-  input: {schema: DocumentAnalysisInputSchema},
+  input: {
+    schema: z.object({
+      documentText: z.string(),
+      userRole: z.enum(['lawyer', 'lawStudent', 'layperson']),
+    }),
+  },
   output: {schema: DocumentAnalysisOutputSchema.shape.summary},
   prompt: `You are an AI legal assistant. Summarize the provided legal document into plain, easy-to-understand language. The summary's complexity should be tailored to the user's role.
 
@@ -112,22 +117,29 @@ const documentAnalysisFlow = ai.defineFlow(
   {
     name: 'documentAnalysisFlow',
     inputSchema: DocumentAnalysisInputSchema,
-    outputSchema: DocumentAnalysisOutputSchema,
+    outputSchema: z.void(),
   },
-  async input => {
-    // Run all three prompts.
-    const [summaryResult, entitiesResult, risksResult] = await Promise.all([
-      summaryPrompt(input),
-      entitiesPrompt({documentText: input.documentText}),
-      risksPrompt({documentText: input.documentText}),
-    ]);
+  async ({documentId, userRole}) => {
+    const docRef = doc(db, 'documents', documentId);
+    const docSnap = await getDoc(docRef);
 
-    const output: DocumentAnalysisOutput = {
-      summary: summaryResult.output!,
-      entities: entitiesResult.output!,
-      risks: risksResult.output!,
-    };
-    
-    return output;
+    if (!docSnap.exists()) {
+      throw new Error(`Document with ID ${documentId} not found.`);
+    }
+
+    const documentText = docSnap.data().documentText;
+
+    // We don't await these. We let them run and update the db independently.
+    summaryPrompt({documentText, userRole}).then(async ({output}) => {
+      if (output) await updateDoc(docRef, {'analysis.summary': output});
+    });
+
+    entitiesPrompt({documentText}).then(async ({output}) => {
+      if (output) await updateDoc(docRef, {'analysis.entities': output});
+    });
+
+    risksPrompt({documentText}).then(async ({output}) => {
+      if (output) await updateDoc(docRef, {'analysis.risks': output});
+    });
   }
 );

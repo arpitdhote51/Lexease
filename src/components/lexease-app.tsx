@@ -8,12 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, updateDoc, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 
 import {
-  analyzeDocument,
+  analyzeDocumentInBackground,
   DocumentAnalysisOutput,
 } from "@/ai/flows/document-analysis";
 
@@ -39,37 +39,46 @@ interface LexeaseAppProps {
 export default function LexeaseApp({ existingDocument: initialDocument }: LexeaseAppProps) {
   const { user } = useAuth();
   const router = useRouter();
-  const [existingDocument, setExistingDocument] = useState(initialDocument);
-  const [documentText, setDocumentText] = useState("");
+  const [document, setDocument] = useState<DocumentData | null>(initialDocument || null);
+  const [documentText, setDocumentText] = useState(initialDocument?.documentText || "");
   const [userRole, setUserRole] = useState<UserRole>("layperson");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<DocumentAnalysisOutput | null>(null);
-  const [file, setFile] = useState<File | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<DocumentAnalysisOutput | null>(initialDocument?.analysis || null);
+  const [file, setFile] = useState<File | null>(initialDocument ? new File([], initialDocument.fileName) : null);
   const [documentId, setDocumentId] = useState<string | null>(initialDocument?.id || null);
 
   const { toast } = useToast();
 
   useEffect(() => {
     if (initialDocument) {
-      setExistingDocument(initialDocument);
-      setDocumentText(initialDocument.documentText);
       setDocumentId(initialDocument.id);
-      if (initialDocument.analysis) {
-        setAnalysisResult(initialDocument.analysis);
-      }
-      if(initialDocument.fileName) {
-        setFile(new global.File([], initialDocument.fileName));
-      }
-    } else {
-        setExistingDocument(null);
-        setDocumentText("");
-        setAnalysisResult(null);
-        setFile(null);
-        setUserRole("layperson");
-        setDocumentId(null);
+      setFile(new File([], initialDocument.fileName));
     }
   }, [initialDocument]);
+
+  useEffect(() => {
+    if (!documentId) return;
+
+    const unsubscribe = onSnapshot(doc(db, "documents", documentId), (doc) => {
+      if (doc.exists()) {
+        const data = doc.data() as DocumentData;
+        setDocument({ ...data, id: doc.id });
+        setDocumentText(data.documentText || "");
+        
+        if (data.analysis) {
+            setAnalysisResult(data.analysis);
+            const { summary, entities, risks } = data.analysis;
+            if (summary && entities && risks) {
+                setIsAnalyzing(false);
+            }
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [documentId]);
+
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -94,7 +103,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
             try {
                 const dataUri = e.target?.result as string;
                 const result = await extractTextFromFile({ fileDataUri: dataUri, fileType: file.type });
-                await saveInitialDocument(file.name, result.text);
+                await saveInitialDocumentAndAnalyze(file.name, result.text);
             } catch (error) {
                 handleFileError(error, file.type);
             }
@@ -112,7 +121,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
     setIsProcessing(false);
   }
 
-  const saveInitialDocument = async (fileName: string, text: string) => {
+  const saveInitialDocumentAndAnalyze = async (fileName: string, text: string) => {
     if (!user) return;
     setDocumentText(text);
 
@@ -122,58 +131,54 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
             fileName: fileName,
             documentText: text,
             createdAt: serverTimestamp(),
-            analysis: null,
+            analysis: {}, // Initialize with empty object
         });
         setDocumentId(newDocRef.id);
+        setIsProcessing(false);
         router.push(`/${newDocRef.id}`, { scroll: false }); 
+
+        // Start analysis in the background
+        handleAnalyze(newDocRef.id, false);
     } catch (error) {
         console.error("Failed to save initial document:", error);
         toast({ variant: "destructive", title: "Save Failed", description: "Could not save the document to the database." });
-    } finally {
         setIsProcessing(false);
     }
   };
 
-  const handleAnalyze = async (forceReanalysis = false) => {
-    if (!documentText.trim() || !documentId) {
-      toast({ variant: "destructive", title: "Error", description: "No document loaded to analyze." });
+  const handleAnalyze = async (docId: string, forceReanalysis = false) => {
+    if (!docId) {
+      toast({ variant: "destructive", title: "Error", description: "No document ID available to analyze." });
       return;
     }
-    if (analysisResult && !forceReanalysis) {
+
+    if (analysisResult && analysisResult.summary && analysisResult.entities && analysisResult.risks && !forceReanalysis) {
         toast({ title: "Analysis Already Complete", description: "Click 'Re-Analyze' to run the analysis again." });
         return;
     }
 
     setIsAnalyzing(true);
-    setAnalysisResult(null); // Clear previous results while analyzing
-    toast({ title: "Analysis Started", description: "Your document analysis is running. Results will appear here shortly." });
+    if(forceReanalysis) {
+        setAnalysisResult(null);
+        const docRef = doc(db, 'documents', docId);
+        await updateDoc(docRef, { analysis: {} });
+    }
+    toast({ title: "Analysis Started", description: "Your document analysis is running in the background. Results will appear here shortly." });
 
-    // Non-blocking analysis
-    analyzeDocument({ documentText: documentText, userRole })
-        .then(async (results) => {
-            // Update state to show results in UI
-            setAnalysisResult(results);
-
-            // Save results to Firestore
-            const docRef = doc(db, 'documents', documentId);
-            await updateDoc(docRef, { analysis: results });
-
-            setIsAnalyzing(false);
-            toast({ title: "Analysis Complete", description: "Your document analysis has finished." });
-        })
+    analyzeDocumentInBackground({ documentId: docId, userRole })
         .catch((error) => {
-            console.error("Analysis failed:", error);
-            toast({ variant: "destructive", title: "Analysis Failed", description: "An error occurred while analyzing the document." });
+            console.error("Analysis failed to start:", error);
+            toast({ variant: "destructive", title: "Analysis Failed", description: "An error occurred while starting the analysis." });
             setIsAnalyzing(false);
         });
   };
   
-  const AnalysisPlaceholder = () => (
+  const AnalysisPlaceholder = ({title}: {title: string}) => (
     <div className="space-y-4 p-6">
-      <Skeleton className="h-8 w-1/3" />
-      <Skeleton className="h-40 w-full" />
-      <Skeleton className="h-8 w-1/4" />
-      <Skeleton className="h-20 w-full" />
+      <h3 className="font-semibold text-lg">{title}</h3>
+      <Skeleton className="h-4 w-3/4" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-5/6" />
     </div>
   );
   
@@ -190,7 +195,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
     event.preventDefault();
   }, []);
 
-  const isLoading = isProcessing || isAnalyzing;
+  const isLoading = isProcessing;
 
   const handleStartNew = () => {
     router.push('/new');
@@ -207,7 +212,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
             <CardHeader>
               <CardTitle className="font-bold text-2xl text-foreground">Document Input</CardTitle>
               <CardDescription>
-                Upload a document to get started.
+                Upload a document to get started. The analysis will begin automatically.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -233,22 +238,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
                     <div className="text-center p-4">
                         <FileIcon className="mx-auto h-12 w-12 text-muted-foreground" />
                         <p className="mt-2 font-semibold truncate">{file.name}</p>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="mt-2 text-red-500 hover:text-red-700"
-                            onClick={() => {
-                                setFile(null);
-                                setDocumentText('');
-                                setAnalysisResult(null);
-                                setDocumentId(null);
-                                router.push('/new');
-                            }}
-                            disabled={isLoading}
-                        >
-                            <X className="mr-2 h-4 w-4" />
-                            Remove
-                        </Button>
+                         <p className="text-sm text-muted-foreground">Redirecting to analysis page...</p>
                     </div>
                 ) : (
                     <label htmlFor="file-upload" className={`w-full h-full flex flex-col items-center justify-center text-center ${!isLoading ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
@@ -264,7 +254,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
                 </div>
 
               <div className="space-y-4">
-                <Label className="font-semibold text-foreground">Select Your Role</Label>
+                <Label className="font-semibold text-foreground">Select Your Role (for analysis)</Label>
                 <RadioGroup
                   defaultValue="layperson"
                   className="flex flex-col sm:flex-row gap-4"
@@ -286,16 +276,6 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
                   </div>
                 </RadioGroup>
               </div>
-              <Button onClick={() => handleAnalyze(false)} disabled={isLoading || !documentId || !!analysisResult} className="w-full bg-accent text-white font-semibold py-3 rounded-lg hover:bg-accent/90">
-                {isAnalyzing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Analyzing...
-                  </>
-                ) : (
-                  "Analyze Document"
-                )}
-              </Button>
             </CardContent>
           </Card>
         </div>
@@ -318,54 +298,42 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
                             Start New Analysis
                         </Button>
                     )}
-                    <Button onClick={() => handleAnalyze(true)} disabled={isLoading || !documentId} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-accent/90">
+                    <Button onClick={() => handleAnalyze(documentId, true)} disabled={isAnalyzing} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-accent/90">
                         {isAnalyzing ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             Analyzing...
                           </>
-                        ) : analysisResult ? "Re-Analyze" : "Analyze Document" }
+                        ) : "Re-Analyze" }
                     </Button>
                  </div>
               )}
             </CardHeader>
             <CardContent>
-              {isAnalyzing && !analysisResult ? <AnalysisPlaceholder /> :
-                !documentId ? (
+              {!documentId ? (
                   <div className="text-center text-muted-foreground py-16">
-                    <p>Your analysis results will appear here once you upload and analyze a document.</p>
+                    <p>Your analysis results will appear here once you upload a document.</p>
                   </div>
                 ) : (
                 <Tabs defaultValue="summary" className="w-full">
                   <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 bg-background">
-                    <TabsTrigger value="summary" disabled={!analysisResult}>Summary</TabsTrigger>
-                    <TabsTrigger value="entities" disabled={!analysisResult}>Key Entities</TabsTrigger>
-                    <TabsTrigger value="risks" disabled={!analysisResult}>Risk Flags</TabsTrigger>
-                    <TabsTrigger value="qa" disabled={!documentId}>Q&A</TabsTrigger>
+                    <TabsTrigger value="summary" disabled={!analysisResult?.summary}>Summary</TabsTrigger>
+                    <TabsTrigger value="entities" disabled={!analysisResult?.entities}>Key Entities</TabsTrigger>
+                    <TabsTrigger value="risks" disabled={!analysisResult?.risks}>Risk Flags</TabsTrigger>
+                    <TabsTrigger value="qa">Q&A</TabsTrigger>
                   </TabsList>
-                  {analysisResult ? (
-                    <>
-                      <TabsContent value="summary">
-                        <SummaryDisplay summary={analysisResult.summary.plainLanguageSummary} />
-                      </TabsContent>
-                      <TabsContent value="entities">
-                        <EntitiesDisplay entities={analysisResult.entities.entities} />
-                      </TabsContent>
-                      <TabsContent value="risks">
-                        <RisksDisplay risks={analysisResult.risks.riskyClauses} />
-                      </TabsContent>
-                    </>
-                  ) : (
-                    <div className="text-center text-muted-foreground py-16">
-                        {isAnalyzing ? (
-                            <AnalysisPlaceholder />
-                        ) : documentId && !analysisResult ? (
-                             <p>Click "Analyze Document" to see the results.</p>
-                        ) : null}
-                    </div>
-                  )}
+                  
+                  <TabsContent value="summary">
+                    {analysisResult?.summary ? <SummaryDisplay summary={analysisResult.summary.plainLanguageSummary} /> : <AnalysisPlaceholder title="Generating Summary..." />}
+                  </TabsContent>
+                  <TabsContent value="entities">
+                    {analysisResult?.entities ? <EntitiesDisplay entities={analysisResult.entities.entities} /> : <AnalysisPlaceholder title="Extracting Entities..." />}
+                  </TabsContent>
+                  <TabsContent value="risks">
+                     {analysisResult?.risks ? <RisksDisplay risks={analysisResult.risks.riskyClauses} /> : <AnalysisPlaceholder title="Flagging Risks..." />}
+                  </TabsContent>
                   <TabsContent value="qa">
-                    {documentId && <QAChat documentId={documentId} documentText={documentText} />}
+                    <QAChat documentId={documentId} documentText={documentText} />
                   </TabsContent>
                 </Tabs>
               )}
