@@ -30,6 +30,7 @@ export default function ChatHistorySidebar() {
 
   const navLinks = [
     { href: "/", icon: "home", label: "Home" },
+    { href: "/lexy", icon: "robot_2", label: "Lexy Chat" },
     { href: "/consult", icon: "groups", label: "Consult a Lawyer" },
     { href: "/learn", icon: "school", label: "Learn Law" },
     { href: "/about", icon: "info", label: "About Us" },
