@@ -1,4 +1,4 @@
-# Firebase Studio
+# LexEase - Your AI-Powered Legal Co-Pilot
 
 This is a Next.js starter project for an AI-powered legal assistant called LexEase, created in Firebase Studio.
 
@@ -11,7 +11,7 @@ To get a local copy up and running, follow these simple steps.
 *   Node.js (v18 or later recommended)
 *   npm or yarn
 
-### Installation
+### Installation & Setup
 
 1.  **Clone the repo**
     ```sh
@@ -49,4 +49,4 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ## Project Overview
 
-For a detailed overview of the project architecture, features, and technology stack, please see the [**LexEase High-Level Technical Specification (hts.md)**](./hts.md).
+For a detailed overview of the project architecture, features, and technology stack, please see the [**LexEase High-Level Technical Specification (LEGACY_README.md)**](./LEGACY_README.md).
