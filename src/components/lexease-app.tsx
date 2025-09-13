@@ -8,10 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import * as pdfjs from "pdfjs-dist";
-import mammoth from "mammoth";
 
-
+import { parseDocument } from "@/ai/flows/parse-document";
 import {
   plainLanguageSummarization,
   PlainLanguageSummarizationInput,
@@ -42,14 +40,12 @@ interface LexeaseAppProps {
     existingDocument?: DocumentData | null;
 }
 
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-
-
 export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
   const router = useRouter();
   const [documentText, setDocumentText] = useState("");
   const [userRole, setUserRole] = useState<UserRole>("layperson");
   const [isLoading, setIsLoading] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<{
     summary: PlainLanguageSummarizationOutput;
     entities: KeyEntityRecognitionOutput;
@@ -90,59 +86,60 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
     }
   };
 
-  const processFile = async (file: File) => {
-    setIsLoading(true);
+  const processFile = async (fileToProcess: File) => {
+    setIsParsing(true);
     setDocumentText('');
-    const fileType = file.type;
-    const reader = new FileReader();
+    
+    const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+    if (!validTypes.includes(fileToProcess.type)) {
+        toast({
+            variant: 'destructive',
+            title: 'Unsupported File Type',
+            description: 'Please upload a .PDF, .DOCX, or .TXT file.',
+        });
+        setFile(null);
+        setIsParsing(false);
+        return;
+    }
 
     try {
-        if (fileType === 'application/pdf') {
-            reader.onload = async (e) => {
-                const typedArray = new Uint8Array(e.target?.result as ArrayBuffer);
-                const pdf = await pdfjs.getDocument(typedArray).promise;
-                let text = '';
-                for (let i = 1; i <= pdf.numPages; i++) {
-                    const page = await pdf.getPage(i);
-                    const textContent = await page.getTextContent();
-                    text += textContent.items.map((item: any) => item.str).join(' ');
-                }
-                setDocumentText(text);
-                setIsLoading(false);
-            };
-            reader.readAsArrayBuffer(file);
-        } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-             reader.onload = async (e) => {
-                const arrayBuffer = e.target?.result as ArrayBuffer;
-                const result = await mammoth.extractRawText({ arrayBuffer });
-                setDocumentText(result.value);
-                setIsLoading(false);
-            };
-            reader.readAsArrayBuffer(file);
-        } else if (fileType === 'text/plain') {
-            reader.onload = (e) => {
-                setDocumentText(e.target?.result as string);
-                setIsLoading(false);
-            };
-            reader.readAsText(file);
-        } else {
-            toast({
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const fileDataUri = e.target?.result as string;
+            try {
+                const { documentText: extractedText } = await parseDocument({ fileDataUri });
+                setDocumentText(extractedText);
+            } catch (serverError) {
+                 console.error('Server-side parsing error:', serverError);
+                 toast({
+                    variant: 'destructive',
+                    title: 'Parsing Error',
+                    description: 'The server could not process your file.',
+                });
+                setFile(null);
+            } finally {
+                setIsParsing(false);
+            }
+        };
+        reader.onerror = () => {
+             console.error('File reading error');
+             toast({
                 variant: 'destructive',
-                title: 'Unsupported File Type',
-                description: 'Please upload a .PDF, .DOCX, or .TXT file.',
+                title: 'File Error',
+                description: 'There was an error reading your file.',
             });
-            setFile(null);
-            setIsLoading(false);
-        }
+            setIsParsing(false);
+        };
+        reader.readAsDataURL(fileToProcess);
     } catch (error) {
         console.error('File processing error:', error);
         toast({
             variant: 'destructive',
             title: 'File Error',
-            description: 'There was an error processing your file.',
+            description: 'An unexpected error occurred while processing your file.',
         });
         setFile(null);
-        setIsLoading(false);
+        setIsParsing(false);
     }
   };
 
@@ -199,13 +196,13 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
   
   const onDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    if(existingDocument || isLoading) return;
+    if(existingDocument || isLoading || isParsing) return;
     const files = event.dataTransfer.files;
     if (files && files.length > 0) {
       setFile(files[0]);
       processFile(files[0]);
     }
-  }, [existingDocument, isLoading]);
+  }, [existingDocument, isLoading, isParsing]);
 
   const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -238,9 +235,14 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
                     className="sr-only"
                     onChange={handleFileChange}
                     accept=".pdf,.docx,.txt"
-                    disabled={isLoading || !!existingDocument}
+                    disabled={isLoading || !!existingDocument || isParsing}
                 />
-                {file ? (
+                {isParsing ? (
+                    <div className="text-center p-4">
+                        <Loader2 className="mx-auto h-12 w-12 text-primary animate-spin" />
+                        <p className="mt-4 font-semibold">Processing File...</p>
+                    </div>
+                ) : file ? (
                     <div className="text-center p-4">
                         <FileIcon className="mx-auto h-12 w-12 text-muted-foreground" />
                         <p className="mt-2 font-semibold truncate">{file.name}</p>
@@ -280,7 +282,7 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
                   className="flex flex-col sm:flex-row gap-4"
                   value={userRole}
                   onValueChange={(value: UserRole) => setUserRole(value)}
-                  disabled={isLoading || !!existingDocument}
+                  disabled={isLoading || !!existingDocument || isParsing}
                 >
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="layperson" id="r1" />
@@ -296,7 +298,7 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
                   </div>
                 </RadioGroup>
               </div>
-              <Button onClick={handleAnalyze} disabled={isLoading || !file || !!analysisResult} className="w-full bg-accent text-white font-semibold py-3 rounded-lg hover:bg-accent/90">
+              <Button onClick={handleAnalyze} disabled={isLoading || isParsing || !file || !!analysisResult} className="w-full bg-accent text-white font-semibold py-3 rounded-lg hover:bg-accent/90">
                 {isLoading && !analysisResult ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -321,7 +323,7 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoading && !analysisResult ? <AnalysisPlaceholder /> :
+              {(isLoading || isParsing) && !analysisResult ? <AnalysisPlaceholder /> :
                 !analysisResult && !documentText && !existingDocument ? (
                   <div className="text-center text-muted-foreground py-16">
                     <p>Your analysis results will appear here once you upload and analyze a document.</p>
@@ -351,7 +353,7 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
                     </>
                   ) : (
                     <div className="text-center text-muted-foreground py-16">
-                        {isLoading ? (
+                        {(isLoading || isParsing) ? (
                             <AnalysisPlaceholder />
                         ) : (
                              <p>Click "Analyze Document" to see the results.</p>
