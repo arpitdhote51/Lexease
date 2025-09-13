@@ -22,10 +22,6 @@ export default function DocumentPage() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user) {
-      router.push("/auth");
-      return;
-    }
 
     const fetchDocument = async () => {
       if (!documentId || !user) return;
@@ -36,11 +32,8 @@ export default function DocumentPage() {
 
         if (docSnap.exists()) {
           const data = docSnap.data();
-          if (data.userId === user.uid) {
-            setDocument({ id: docSnap.id, ...data } as DocumentData);
-          } else {
-            setError("You do not have permission to view this document.");
-          }
+          // Since auth is disabled, we don't need to check for user.uid
+          setDocument({ id: docSnap.id, ...data } as DocumentData);
         } else {
           setError("Document not found.");
         }

@@ -43,7 +43,7 @@ const mockUser = {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   // Set to true to enable Firebase authentication
-  const authEnabled = true; 
+  const authEnabled = false; 
 
   const [user, setUser] = useState<User | null>(authEnabled ? null : mockUser as unknown as User);
   const [loading, setLoading] = useState(authEnabled);
@@ -169,7 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     signIn,
     signUp,
-    signOut,
+signOut,
     sendPasswordReset,
     resendVerificationEmail
   };

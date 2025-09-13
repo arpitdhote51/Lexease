@@ -103,13 +103,6 @@ export default function ChatHistorySidebar() {
             )}
         </nav>
       </ScrollArea>
-
-      <div className="p-4 border-t border-border mt-auto">
-        <a href="#" onClick={(e) => { e.preventDefault(); signOut(); }} className="flex items-center gap-3 px-4 py-2.5 rounded-md text-red-500 hover:bg-red-50 font-medium">
-          <span className="material-symbols-outlined">logout</span>
-          <span>Logout</span>
-        </a>
-      </div>
     </aside>
   );
 }
