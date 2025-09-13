@@ -7,7 +7,7 @@ import { Suspense } from "react";
 function LexyChatPage() {
     return (
         <LexeaseLayout>
-            <main className="flex-1 p-10 overflow-y-auto">
+            <main className="flex-1 p-10 overflow-y-auto h-[calc(100vh-4rem)]">
                  <header className="mb-8">
                     <h1 className="text-3xl font-bold text-primary">Lexy: AI Legal Assistant</h1>
                     <p className="text-muted-foreground mt-1">
@@ -15,7 +15,9 @@ function LexyChatPage() {
                     </p>
                 </header>
                 <Suspense fallback={<div>Loading...</div>}>
-                    <LexyChat />
+                    <div className="h-[calc(100%-8rem)]">
+                        <LexyChat />
+                    </div>
                 </Suspense>
             </main>
         </LexeaseLayout>
