@@ -60,14 +60,14 @@ The application follows a client-server architecture where the Next.js frontend 
 
 ```
 **Data Flow Explanation:**
-1.  The user interacts with the UI in their browser.
+1.  The user interacts with the UI in their browser. This includes uploading documents or asking questions to the Lexy AI assistant.
 2.  Frontend components handle user input (e.g., file uploads, typing questions).
 3.  Client-side libraries (`pdfjs`, `mammoth`) parse uploaded documents to extract text.
-4.  When an AI-powered action is triggered (e.g., "Analyze Document"), a Next.js Server Action is called.
-5.  The Server Action invokes the appropriate Genkit AI flow on the server.
-6.  The Genkit flow communicates with the Google AI (Gemini) model, sending it the document text and a prompt. For drafting, it also fetches templates from Google Cloud Storage.
+4.  When an AI-powered action is triggered (e.g., "Analyze Document" or "Ask Lexy"), a Next.js Server Action is called.
+5.  The Server Action invokes the appropriate Genkit AI flow on the server (`interactiveQA`, `generalLegalQA`, etc.).
+6.  The Genkit flow communicates with the Google AI (Gemini) model, sending it the document text and/or user query.
 7.  The AI model processes the request and returns structured data (JSON).
-8.  The AI flow sends the result back to the frontend, which updates the UI to display the analysis.
+8.  The AI flow sends the result back to the frontend, which updates the UI to display the analysis or chat response.
 
 ---
 
@@ -75,20 +75,13 @@ The application follows a client-server architecture where the Next.js frontend 
 
 This section describes the layout and structure of the main application screens.
 
-### Main Layout
-The application uses a consistent two-panel layout.
-- **Left Sidebar:** A persistent navigation bar with links to major sections:
-  - `New Analysis`
-  - `New Draft`
-  - `Consult a Lawyer`
-  - `Learn Law`
-  - `About Us`
-  - `Contact Us`
-- **Main Content Area:** The primary workspace that changes based on the selected navigation link.
+### Homepage (`/`)
+The landing page features a full-width, interactive chat interface for "Lexy," the AI legal assistant. Below this, it showcases the key capabilities of the platform. After the first user prompt, it redirects to a dedicated chat page.
 
-### Screen Mockups
+### Dedicated Lexy Chat Page (`/lexy`)
+A full-screen, immersive chat experience for interacting with Lexy on general legal matters, accessible via the main navigation and after the first prompt on the homepage.
 
-#### A. Document Analysis Screen (`/new`)
+### Document Analysis Screen (`/new`)
 ```
 +-----------------------------------------------------------------------------+
 | [Sidebar]          | [Main Content Area]                                    |
@@ -109,7 +102,7 @@ The application uses a consistent two-panel layout.
 +-----------------------------------------------------------------------------+
 ```
 
-#### B. Document Drafting Screen (`/draft`)
+### Document Drafting Screen (`/draft`)
 ```
 +-----------------------------------------------------------------------------+
 | [Sidebar]          | [Main Content Area]                                    |
@@ -130,49 +123,16 @@ The application uses a consistent two-panel layout.
 
 ---
 
-## 4. Process Flow Diagram
+## 4. Process Flow Diagrams
 
-This diagram illustrates the end-to-end process for analyzing a legal document.
-
+### Document Analysis Flow
 ```
-(Start)
-   |
-   v
-[User lands on the "New Analysis" page]
-   |
-   v
-[User uploads a document (PDF, DOCX, or TXT)]
-   |
-   v
-[Client-side JavaScript parses the file and extracts raw text]
-   |
-   v
-[User selects their role (e.g., "Layperson")]
-   |
-   v
-[User clicks "Analyze Document"]
-   |
-   v
-[A Server Action is called, passing the document text and user role]
-   |
-   v
-[Server runs three AI flows in parallel:]
-   |
-   +-----> [plainLanguageSummarization]: Generates a simple summary.
-   +-----> [keyEntityRecognition]: Extracts parties, dates, etc.
-   +-----> [riskFlagging]: Identifies risky clauses.
-   |
-   v
-[All AI results are combined into a single JSON object]
-   |
-   v
-[Results are sent back to the client]
-   |
-   v
-[UI updates to display the Summary, Key Entities, and Risk Flags in their respective tabs]
-   |
-   v
-(End)
+(Start) -> [User lands on "New Analysis" page] -> [User uploads a document] -> [Client-side JS parses file] -> [User selects role] -> [User clicks "Analyze Document"] -> [Server Action calls AI flows] -> [Three flows run in parallel: Summary, Entities, Risks] -> [Results combined and sent to client] -> [UI updates with analysis] -> (End)
+```
+
+### General Legal Q&A (Lexy Chat) Flow
+```
+(Start) -> [User enters question on Homepage] -> [App redirects to /lexy with the question] -> [Server Action calls 'generalLegalQAFlow'] -> [AI model generates answer] -> [Answer sent to client] -> [UI updates with Lexy's response] -> (End)
 ```
 
 ---
@@ -180,24 +140,26 @@ This diagram illustrates the end-to-end process for analyzing a legal document.
 ## 5. List of Features
 
 ### Core Features
+- **General Legal Q&A with "Lexy"**: An interactive AI legal assistant, trained on Indian law, available on the homepage and a dedicated chat page. Users can ask general legal questions and receive detailed, cited answers.
 - **Document Upload & Parsing:** Users can upload legal documents in `.pdf`, `.docx`, and `.txt` formats. The app parses these files in the browser to extract text content.
 - **AI-Powered Document Analysis:**
   - **Plain Language Summary:** Generates an easy-to-understand summary of complex legal text, tailored to the user's selected role (Layperson, Law Student, or Lawyer).
   - **Key Entity Recognition:** Automatically identifies and categorizes key entities such as parties, dates, locations, and monetary amounts.
   - **Risk Flagging:** Scans the document for potentially risky, unusual, or problematic clauses and highlights them for the user.
-- **Interactive Q&A:** A chat interface where users can ask specific questions about the analyzed document. The AI provides answers based on the document's content and can adopt a persona (e.g., defense counsel) to assist in case preparation.
+- **Interactive Q&A (Per Document):** A chat interface where users can ask specific questions about an already-analyzed document. The AI provides answers based on the document's content.
 - **AI-Powered Document Drafting:**
   - Users can select a document type (e.g., Affidavit) and language.
-  - By providing unstructured details, the AI drafts a formatted legal document by intelligently filling in a template retrieved from Google Cloud Storage.
+  - By providing unstructured details, the AI drafts a formatted legal document.
 - **Downloadable Drafts:** Generated drafts can be downloaded as both `.txt` and `.pdf` files.
 
 ### Supporting Features
 - **Speech-to-Text & Text-to-Speech:**
-  - **Speech-to-Text (STT):** The Q&A chat includes a "mic" button for voice input.
-  - **Text-to-Speech (TTS):** AI-generated answers in the chat can be read aloud.
+  - **Speech-to-Text (STT):** The Lexy and Q&A chats include a "mic" button for voice input.
+  - **Text-to-Speech (TTS):** AI-generated answers in the chats can be read aloud.
 - **Static Content Pages:**
-  - **Consult a Lawyer:** A page displaying a list of fictional lawyers for consultation booking (demonstration feature).
+  - **Consult a Lawyer:** A page displaying a list of fictional lawyers for consultation booking.
   - **Learn Law:** A page with a gallery of educational legal videos.
   - **About & Contact:** Static pages providing information about the company and how to get in touch.
 - **Client-Side Routing:** A responsive, single-page application experience powered by Next.js routing.
 - **Responsive Design:** The UI is designed to be usable across different screen sizes.
+```
