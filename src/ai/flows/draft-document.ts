@@ -41,7 +41,9 @@ const findRelevantTemplates = ai.defineTool(
     const storage = new Storage();
     const bucketName = 'legal_drafts';
     
-    const filePath = `${language.toLowerCase()}_drafts/Affidavit.txt`;
+    // Construct the file path based on language and document type.
+    // e.g., english_drafts/Affidavit.txt
+    const filePath = `${language.toLowerCase()}_drafts/${documentType}.txt`;
     
     try {
       console.log(`Attempting to read from GCS: gs://${bucketName}/${filePath}`);
@@ -50,46 +52,21 @@ const findRelevantTemplates = ai.defineTool(
       
       const [exists] = await file.exists();
       if (!exists) {
-        throw new Error(`File not found at path: ${filePath}`);
+        throw new Error(`Template file not found at path: gs://${bucketName}/${filePath}. Please ensure the file exists.`);
       }
 
       const [content] = await file.download();
       const template = content.toString('utf8');
       
       if (!template) {
-          throw new Error('Template file is empty.');
+          throw new Error(`Template file is empty: gs://${bucketName}/${filePath}`);
       }
 
       return { template };
     } catch (error) {
-      console.warn(`Could not retrieve template from GCS. Falling back to basic template. Error:`, error);
-      // Fallback to a basic template if GCS fails
-      const fallbackTemplate = `
-        Format for Affidavit:
-        (To be Printed in a Rs. 20 Stamp Paper)
-
-        AFFIDAVIT OF [Mr./Ms./Mrs. Name]
-
-        I, [Name], S/o, D/o [Father's Name], aged about [Age] years and residing at [Address], do hereby solemnly affirm and sincerely state as follows:
-
-        I state that I have lost my [Degree/Certificate Type] degree certificate/Grade sheets/Consolidated Grade Sheet, Certificate Serial No's are [Certificate Serial Numbers], Registration No. [Registration Number] given in the year [Year of Issue] and if I do manage to recover or find the original certificate, I shall return the duplicate certificate to the concerned authorities at [Name of Institution], [Location of Institution].
-
-        The above mentioned facts are true and correct to the best of my knowledge, information and belief.
-
-
-        Signature of the Deponent
-
-
-        Solemnly affirmed at [Place of Affirmation]
-        On this [Day] day of [Month]
-
-        Deponent signed before me
-
-        And signed his/her name in my presence
-        
-        Seal of the Notary
-      `;
-      return { template: fallbackTemplate };
+      console.error(`GCS template retrieval failed:`, error);
+      // Re-throw the error to be caught by the calling flow, which will notify the user.
+      throw new Error(`Failed to retrieve template from GCS. Please check the file path and bucket permissions. Details: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 );
@@ -131,9 +108,7 @@ const draftDocumentFlow = ai.defineFlow(
     outputSchema: DraftDocumentOutputSchema,
   },
   async (input) => {
-    // For now, we only support Affidavit to test the GCS connection.
-    const flowInput = { ...input, documentType: 'Affidavit' };
-    const { output } = await draftingAgentPrompt(flowInput);
+    const { output } = await draftingAgentPrompt(input);
     return output!;
   }
 );
