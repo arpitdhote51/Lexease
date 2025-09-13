@@ -1,6 +1,6 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { initializeFirestore, persistentLocalCache } from "firebase/firestore";
+import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
+import { getAuth, Auth } from "firebase/auth";
+import { initializeFirestore, persistentLocalCache, Firestore } from "firebase/firestore";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDcFJTJnGLI-uVStqI8uuQVcQMY34ilMJg",
@@ -12,12 +12,18 @@ const firebaseConfig = {
     measurementId: ""
 };
 
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const auth = getAuth(app);
+let app: FirebaseApp;
+let auth: Auth;
+let db: Firestore;
 
-// Use initializeFirestore to enable offline persistence
-const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({})
-});
+if (typeof window !== 'undefined') {
+    app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    auth = getAuth(app);
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({})
+    });
+}
 
+// These exports can be undefined on the server-side,
+// so ensure they are only used in client components.
 export { app, auth, db };
