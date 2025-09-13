@@ -1,9 +1,10 @@
+
 "use client";
 
 import { Suspense } from 'react';
 import LexeaseLayout from "@/components/layout/lexease-layout";
 import { useSearchParams } from "next/navigation";
-import { lawyers as lawyersData } from "@/app/data/lawyers.json";
+import lawyersData from "@/app/data/lawyers.json";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Image from "next/image";
@@ -13,7 +14,7 @@ import { CheckCircle2, Video, Calendar, Clock } from "lucide-react";
 function ConfirmationContent() {
   const searchParams = useSearchParams();
   const lawyerId = searchParams.get("lawyerId");
-  const lawyer = lawyersData.find((l) => l.id === lawyerId);
+  const lawyer = lawyersData.lawyers.find((l) => l.id === lawyerId);
 
   if (!lawyer) {
     return (

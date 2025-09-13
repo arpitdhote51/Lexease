@@ -45,7 +45,8 @@ export default function LexyChat() {
         id: "welcome-msg",
     };
 
-    if (initialPrompt && messages.length === 0) {
+    // Only process initialPrompt if we are on the /lexy page
+    if (initialPrompt && !isHomePage && messages.length === 0) {
       const userMessage: Message = { role: 'user', content: initialPrompt, id: `user-${Date.now()}` };
       const initialMessages = [welcomeMessage, userMessage];
       setMessages(initialMessages);
@@ -54,16 +55,14 @@ export default function LexyChat() {
       setMessages([welcomeMessage]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialPrompt]);
+  }, [initialPrompt, isHomePage]);
 
   const scrollToBottom = useCallback(() => {
-    if (scrollAreaRef.current) {
-        const viewport = scrollAreaRef.current.querySelector('div[data-radix-scroll-area-viewport]');
-        if (viewport) {
-            setTimeout(() => {
-                viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
-            }, 100);
-        }
+    const viewport = scrollAreaRef.current?.querySelector('div[data-radix-scroll-area-viewport]');
+    if (viewport) {
+      setTimeout(() => {
+        viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
+      }, 100);
     }
   }, []);
 
@@ -80,7 +79,7 @@ export default function LexyChat() {
     } catch (error) {
         console.error("General Q&A failed:", error);
         toast({ variant: "destructive", title: "Error", description: "Could not get an answer. Please try again." });
-        setMessages(prev => prev.slice(0, -1));
+        // Don't remove the user message on error, so they can retry.
     } finally {
         setIsLoading(false);
     }
@@ -101,7 +100,7 @@ export default function LexyChat() {
     setMessages(newMessages);
     setInput("");
     
-    fetchAnswer(currentInput, newMessages);
+    await fetchAnswer(currentInput, newMessages);
   };
   
   const handlePlayAudio = async (text: string, messageId: string) => {
@@ -198,7 +197,7 @@ export default function LexyChat() {
                   }`}
                 >
                   <p className="whitespace-pre-wrap font-body leading-relaxed">{message.content}</p>
-                   {message.role === "assistant" && (
+                   {message.role === "assistant" && message.id !== 'welcome-msg' && (
                      <Button
                         variant="ghost"
                         size="icon"

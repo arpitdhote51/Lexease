@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookOpen, Scale, Search, FileText, Languages, Shield, ArrowRight } from "lucide-react";
 import LexyChat from "@/components/lexy-chat";
+import { Suspense } from "react";
 
 const features = [
   {
@@ -69,8 +70,10 @@ export default function HomePage() {
                 LexEase is a highly capable AI legal assistant designed for Indian legal professionals. Ask Lexy anything below.
               </p>
             </div>
-            <div className="w-full max-w-4xl mt-10">
-              <LexyChat />
+            <div className="w-full max-w-4xl mt-10 h-[500px]">
+              <Suspense fallback={<div className="w-full h-full bg-white/50 shadow-lg rounded-2xl border border-border/50 backdrop-blur-sm animate-pulse" />}>
+                <LexyChat />
+              </Suspense>
             </div>
           </div>
         </section>

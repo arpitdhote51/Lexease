@@ -1,7 +1,8 @@
+
 "use client";
 import LexeaseLayout from "@/components/layout/lexease-layout";
 import LawyerCard from "@/components/lawyer-card";
-import { lawyers as lawyersData } from "@/app/data/lawyers.json";
+import lawyersData from "@/app/data/lawyers.json";
 
 export type Lawyer = {
   id: string;
@@ -13,10 +14,11 @@ export type Lawyer = {
   testimonial: string;
   location: string;
   avatarUrl: string;
+  email: string;
 };
 
 export default function ConsultPage() {
-  const lawyers: Lawyer[] = lawyersData;
+  const lawyers: Lawyer[] = lawyersData.lawyers;
 
   return (
     <LexeaseLayout>
