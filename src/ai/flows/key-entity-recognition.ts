@@ -4,7 +4,7 @@
  * @fileOverview This file defines a Genkit flow for identifying key entities in a legal document.
  *
  * It includes:
- * - `identifyKeyEntities`: The main function to trigger the flow.
+ * - `keyEntityRecognition`: The main function to trigger the flow.
  * - `KeyEntityRecognitionInput`: The input type for the flow, defining the document content.
  * - `KeyEntityRecognitionOutput`: The output type for the flow, listing identified entities.
  */
@@ -49,6 +49,7 @@ const keyEntityRecognitionPrompt = ai.definePrompt({
   prompt: `You are an AI assistant specializing in legal document analysis.
   Your task is to identify and extract key entities from the following legal document.
   The entities should include parties involved, dates, locations, and other relevant information.
+  The extracted entities should be in the same language as the document.
 
   Document:
   {{{documentText}}}

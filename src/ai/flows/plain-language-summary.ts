@@ -46,6 +46,7 @@ const prompt = ai.definePrompt({
 
   Summarize the following legal document into plain, easy-to-understand language tailored to the user's role.
   The summary should focus on the key points and obligations within the document.
+  The summary should be in the same language as the provided legal document.
 
   User Role: {{{userRole}}}
   Legal Document:

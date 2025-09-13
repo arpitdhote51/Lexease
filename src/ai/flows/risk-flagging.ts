@@ -38,6 +38,7 @@ const riskFlaggingPrompt = ai.definePrompt({
   prompt: `You are an AI legal assistant tasked with identifying potentially risky or unusual clauses in legal documents.
 
   Analyze the following legal text and identify any clauses that could be problematic, unusual, or create a potential risk for the user. Provide a list of the risky clauses.
+  The response should be in the same language as the document.
 
   Legal Text:
   {{{documentText}}}
