@@ -71,23 +71,22 @@ const findRelevantTemplates = ai.defineTool(
 
       try {
         const bucket = storage.bucket(bucketName);
-        // Note: This lists all files. For deep nesting, consider `prefix` and `delimiter`.
         const [files] = await bucket.getFiles({ prefix: languageFolder });
 
         if (files.length === 0) {
-            throw new Error(`No templates found in folder: ${languageFolder}`);
+            throw new Error(`No templates found in GCS folder: ${languageFolder}`);
         }
         
         // Find the best match based on the document type (filename)
         // This is a simple string search; can be improved with more advanced matching
-        let bestMatch = files.find(file => file.name.toLowerCase().includes(documentType.toLowerCase()));
+        let bestMatch = files.find(file => file.name.toLowerCase().includes(documentType.toLowerCase()) && !file.name.endsWith('/'));
 
         if (!bestMatch) {
             console.warn(`No specific match for "${documentType}". Falling back to the first available template.`);
             bestMatch = files.find(f => f.name.endsWith('.docx') || f.name.endsWith('.pdf') || f.name.endsWith('.txt'));
             
             if (!bestMatch) {
-                throw new Error('No valid template files found in the specified language folder.');
+                throw new Error(`No valid template files (.docx, .pdf, .txt) found in the '${languageFolder}' folder.`);
             }
         }
         
@@ -95,9 +94,10 @@ const findRelevantTemplates = ai.defineTool(
         const template = await extractText(contents, bestMatch.name);
         return { template };
 
-      } catch (error) {
+      } catch (error: any) {
         console.error(`Failed to read from GCS bucket "${bucketName}":`, error);
-        throw new Error(`Could not retrieve template for "${documentType}" in ${language}.`);
+        // Re-throw a more user-friendly error
+        throw new Error(`Could not retrieve template for "${documentType}" in ${language}. Reason: ${error.message}`);
       }
     }
 );
