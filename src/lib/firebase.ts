@@ -4,13 +4,13 @@ import { initializeFirestore, persistentLocalCache, type Firestore } from "fireb
 import { getAnalytics, type Analytics } from "firebase/analytics";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyDcFJTJnGLI-uVStqI8uuQVcQMY34ilMJg",
-    authDomain: "studio-7376954909-7abc4.firebaseapp.com",
-    projectId: "studio-7376954909-7abc4",
-    storageBucket: "studio-7376954909-7abc4.firebasestorage.app",
-    messagingSenderId: "131083878984",
-    appId: "1:131083878984:web:4504e29ddc8d7b405e4e7d",
-    measurementId: "G-GDEGN7X24J"
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+    measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
 let app: FirebaseApp;
@@ -19,7 +19,7 @@ let db: Firestore;
 let analytics: Analytics;
 
 // Initialize Firebase on the client side
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
     if (!getApps().length) {
         app = initializeApp(firebaseConfig);
     } else {
@@ -29,7 +29,9 @@ if (typeof window !== 'undefined') {
     db = initializeFirestore(app, {
         localCache: persistentLocalCache({})
     });
-    analytics = getAnalytics(app);
+    if (firebaseConfig.measurementId) {
+      analytics = getAnalytics(app);
+    }
 }
 
 // Export the initialized instances
