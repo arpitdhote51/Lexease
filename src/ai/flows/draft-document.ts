@@ -11,6 +11,8 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { Storage } from '@google-cloud/storage';
+import mammoth from 'mammoth';
+import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 const DraftDocumentInputSchema = z.object({
   documentType: z.string().describe('The type of legal document to draft (e.g., "Simple Affidavit").'),
@@ -23,6 +25,28 @@ const DraftDocumentOutputSchema = z.object({
   draftContent: z.string().describe('The generated legal document draft.'),
 });
 export type DraftDocumentOutput = z.infer<typeof DraftDocumentOutputSchema>;
+
+// Helper function to extract text from a buffer
+async function extractText(buffer: Buffer, fileName: string): Promise<string> {
+    if (fileName.endsWith('.docx')) {
+        const { value } = await mammoth.extractRawText({ buffer });
+        return value;
+    } else if (fileName.endsWith('.pdf')) {
+        const data = new Uint8Array(buffer);
+        const pdf = await pdfjs.getDocument(data).promise;
+        let text = '';
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            text += textContent.items.map((item: any) => item.str).join(' ');
+        }
+        return text;
+    } else if (fileName.endsWith('.txt')) {
+        return buffer.toString('utf-8');
+    }
+    throw new Error(`Unsupported file type: ${fileName}`);
+}
+
 
 // Tool to find relevant legal templates from Google Cloud Storage
 const findRelevantTemplates = ai.defineTool(
@@ -41,20 +65,33 @@ const findRelevantTemplates = ai.defineTool(
       console.log(`Searching GCS for template: ${documentType} in ${language}`);
       const storage = new Storage();
       const bucketName = 'legal_drafts';
-
-      // Assumes file naming convention like "Simple_Affidavit.txt" and folder structure like "English/"
-      const fileName = `${documentType.replace(/ /g, '_')}.txt`;
-      const filePath = `${language}/${fileName}`;
+      const languageFolder = language === 'English' ? 'english_drafts/' : `${language.toLowerCase()}_drafts/`;
 
       try {
         const bucket = storage.bucket(bucketName);
-        const file = bucket.file(filePath);
-        const [exists] = await file.exists();
-        if (!exists) {
-            throw new Error(`Template file not found at path: ${filePath}`);
+        const [files] = await bucket.getFiles({ prefix: languageFolder });
+
+        if (files.length === 0) {
+            throw new Error(`No templates found in folder: ${languageFolder}`);
         }
-        const contents = await file.download();
-        const template = contents.toString();
+
+        // Find the best match based on the document type
+        // This is a simple string search; can be improved with more advanced matching
+        const bestMatch = files.find(file => file.name.toLowerCase().includes(documentType.toLowerCase().replace(/ /g, '_')));
+
+        if (!bestMatch) {
+            // Fallback to the first file if no good match is found
+            console.warn(`No specific match for "${documentType}". Falling back to the first available template.`);
+            const fallbackFile = files.find(f => f.name.endsWith('.docx') || f.name.endsWith('.pdf') || f.name.endsWith('.txt'));
+            if (!fallbackFile) throw new Error('No valid template files found.');
+            
+            const [contents] = await fallbackFile.download();
+            const template = await extractText(contents, fallbackFile.name);
+            return { template };
+        }
+        
+        const [contents] = await bestMatch.download();
+        const template = await extractText(contents, bestMatch.name);
         return { template };
 
       } catch (error) {
