@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle, BookOpen, Scale, FileText, Search, Languages, Shield, Briefcase, GitBranch, ArrowRight } from "lucide-react";
+import { BookOpen, Scale, Search, FileText, Languages, Shield, ArrowRight } from "lucide-react";
+import LexyChat from "@/components/lexy-chat";
 
 const features = [
   {
@@ -41,7 +42,7 @@ export default function HomePage() {
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground font-body">
       <header className="px-4 lg:px-6 h-14 flex items-center bg-white border-b">
-        <Link href="#" className="flex items-center justify-center" prefetch={false}>
+        <Link href="/" className="flex items-center justify-center" prefetch={false}>
           <h1 className="text-2xl font-bold text-primary font-headline">LexEase</h1>
         </Link>
         <nav className="ml-auto flex gap-4 sm:gap-6">
@@ -60,7 +61,7 @@ export default function HomePage() {
       <main className="flex-1">
         <section className="w-full py-12 md:py-24 lg:py-32 xl:py-48 bg-gradient-to-br from-primary/5 via-background to-background">
           <div className="container px-4 md:px-6">
-            <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:gap-12 xl:grid-cols-[1fr_600px]">
+            <div className="grid gap-6 lg:grid-cols-2 lg:gap-12 xl:grid-cols-[1fr_600px]">
               <div className="flex flex-col justify-center space-y-4">
                 <div className="space-y-4">
                   <h1 className="text-4xl font-bold tracking-tighter text-primary sm:text-5xl xl:text-6xl/none font-headline">
@@ -79,9 +80,8 @@ export default function HomePage() {
                   </Button>
                 </div>
               </div>
-              <div className="relative hidden lg:block">
-                 <div className="absolute inset-0 bg-gradient-to-br from-primary to-accent rounded-full blur-3xl opacity-20"></div>
-                 <Scale className="relative w-48 h-48 mx-auto text-primary opacity-60"/>
+              <div className="hidden lg:flex items-center justify-center">
+                 <LexyChat />
               </div>
             </div>
           </div>

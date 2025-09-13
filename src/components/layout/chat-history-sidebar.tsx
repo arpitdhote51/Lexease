@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -8,7 +9,7 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { type DocumentData } from "@/components/dashboard";
+import { type DocumentData } from "@/lib/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "../ui/separator";
 
@@ -28,6 +29,7 @@ export default function ChatHistorySidebar() {
   };
 
   const navLinks = [
+    { href: "/", icon: "home", label: "Home" },
     { href: "/consult", icon: "groups", label: "Consult a Lawyer" },
     { href: "/learn", icon: "school", label: "Learn Law" },
     { href: "/about", icon: "info", label: "About Us" },
