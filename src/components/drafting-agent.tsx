@@ -9,6 +9,7 @@ import { Textarea } from "./ui/textarea";
 import { Loader2 } from "lucide-react";
 import { draftDocument } from "@/ai/flows/draft-document";
 import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from "./ui/skeleton";
 
 export default function DraftingAgent() {
   const [documentType, setDocumentType] = useState("");
@@ -84,7 +85,7 @@ export default function DraftingAgent() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="Simple Affidavit">Simple Affidavit</SelectItem>
-                                        <SelectItem value="Divorce Petition" disabled>Divorce Petition (Coming Soon)</SelectItem>
+                                        <SelectItem value="Mutual NDA">Mutual NDA</SelectItem>
                                         <SelectItem value="Sale Agreement" disabled>Sale Agreement (Coming Soon)</SelectItem>
                                     </SelectContent>
                                 </Select>
