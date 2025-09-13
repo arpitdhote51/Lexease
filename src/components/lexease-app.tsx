@@ -32,7 +32,7 @@ import EntitiesDisplay from "./entities-display";
 import RisksDisplay from "./risks-display";
 import QAChat from "./qa-chat";
 import { Skeleton } from "./ui/skeleton";
-import type { DocumentData } from "./dashboard";
+import type { DocumentData } from "@/lib/types";
 import Header from "./layout/header";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;

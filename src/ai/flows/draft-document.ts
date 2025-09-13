@@ -14,6 +14,8 @@ import { Storage } from '@google-cloud/storage';
 import mammoth from 'mammoth';
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
 const DraftDocumentInputSchema = z.object({
   documentType: z.string().describe('The type of legal document to draft (e.g., "Simple Affidavit").'),
   language: z.string().describe('The language for the draft (e.g., "English", "Hindi").'),
@@ -65,22 +67,22 @@ const findRelevantTemplates = ai.defineTool(
       console.log(`Searching GCS for template: ${documentType} in ${language}`);
       const storage = new Storage();
       const bucketName = 'legal_drafts';
-      const languageFolder = language === 'English' ? 'english_drafts/' : `${language.toLowerCase()}_drafts/`;
+      const languageFolder = language.toLowerCase() + '_drafts/';
 
       try {
         const bucket = storage.bucket(bucketName);
+        // Note: This lists all files. For deep nesting, consider `prefix` and `delimiter`.
         const [files] = await bucket.getFiles({ prefix: languageFolder });
 
         if (files.length === 0) {
             throw new Error(`No templates found in folder: ${languageFolder}`);
         }
-
-        // Find the best match based on the document type
+        
+        // Find the best match based on the document type (filename)
         // This is a simple string search; can be improved with more advanced matching
-        const bestMatch = files.find(file => file.name.toLowerCase().includes(documentType.toLowerCase().replace(/ /g, '_')));
+        const bestMatch = files.find(file => file.name.toLowerCase().includes(documentType.toLowerCase()));
 
         if (!bestMatch) {
-            // Fallback to the first file if no good match is found
             console.warn(`No specific match for "${documentType}". Falling back to the first available template.`);
             const fallbackFile = files.find(f => f.name.endsWith('.docx') || f.name.endsWith('.pdf') || f.name.endsWith('.txt'));
             if (!fallbackFile) throw new Error('No valid template files found.');

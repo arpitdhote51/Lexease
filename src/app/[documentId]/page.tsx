@@ -5,10 +5,28 @@ import { useParams, useRouter } from "next/navigation";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/use-auth";
-import LexeaseApp from "@/components/lexease-app";
-import { type DocumentData } from "@/components/dashboard";
+import dynamic from "next/dynamic";
+import { type DocumentData } from "@/lib/types";
 import { Loader2 } from "lucide-react";
 import LexeaseLayout from "@/components/layout/lexease-layout";
+import { Skeleton } from "@/components/ui/skeleton";
+
+const LexeaseApp = dynamic(() => import('@/components/lexease-app'), {
+  ssr: false,
+  loading: () => <AnalysisPlaceholder />,
+});
+
+const AnalysisPlaceholder = () => (
+    <div className="p-10">
+        <div className="space-y-4 p-6">
+            <Skeleton className="h-8 w-1/3" />
+            <Skeleton className="h-40 w-full" />
+            <Skeleton className="h-8 w-1/4" />
+            <Skeleton className="h-20 w-full" />
+        </div>
+    </div>
+);
+
 
 export default function DocumentPage() {
   const { user, loading: authLoading } = useAuth();
@@ -32,7 +50,6 @@ export default function DocumentPage() {
 
         if (docSnap.exists()) {
           const data = docSnap.data();
-          // Since auth is disabled, we don't need to check for user.uid
           setDocument({ id: docSnap.id, ...data } as DocumentData);
         } else {
           setError("Document not found.");
