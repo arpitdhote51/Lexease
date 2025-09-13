@@ -39,10 +39,10 @@ const features = [
 
 export default function HomePage() {
   return (
-    <div className="flex flex-col min-h-screen bg-background text-foreground">
+    <div className="flex flex-col min-h-screen bg-background text-foreground font-body">
       <header className="px-4 lg:px-6 h-14 flex items-center bg-white border-b">
         <Link href="#" className="flex items-center justify-center" prefetch={false}>
-          <h1 className="text-2xl font-bold text-primary">LexEase</h1>
+          <h1 className="text-2xl font-bold text-primary font-headline">LexEase</h1>
         </Link>
         <nav className="ml-auto flex gap-4 sm:gap-6">
           <Link href="/new" className="text-sm font-medium hover:underline underline-offset-4" prefetch={false}>
@@ -64,10 +64,10 @@ export default function HomePage() {
               <div className="flex flex-col justify-center space-y-4">
                 <div className="space-y-4">
                   <h1 className="text-4xl font-bold tracking-tighter text-primary sm:text-5xl xl:text-6xl/none font-headline">
-                    Meet Lexy: Your Indian Legal AI Assistant
+                    Your AI-Powered Legal Co-Pilot for Indian Law
                   </h1>
                   <p className="max-w-[600px] text-muted-foreground md:text-xl">
-                    Lexy is a highly capable AI legal assistant designed for Indian legal professionals, equipped with a comprehensive, up-to-date knowledge base and advanced analytical capabilities.
+                    LexEase is a highly capable AI legal assistant designed for Indian legal professionals, equipped with a comprehensive, up-to-date knowledge base and advanced analytical capabilities.
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
@@ -96,7 +96,7 @@ export default function HomePage() {
                   Designed for the Modern Indian Legal Professional
                 </h2>
                 <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                  Lexy integrates powerful AI with a deep understanding of India's legal landscape to provide unparalleled support.
+                  LexEase integrates powerful AI with a deep understanding of India's legal landscape to provide unparalleled support.
                 </p>
               </div>
             </div>
@@ -125,7 +125,7 @@ export default function HomePage() {
                 Streamline Your Legal Workflow Today
               </h2>
               <p className="mx-auto max-w-[600px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                Leverage the power of AI to conduct faster research, draft more efficiently, and build stronger arguments. Get started with Lexy.
+                Leverage the power of AI to conduct faster research, draft more efficiently, and build stronger arguments. Get started with LexEase.
               </p>
             </div>
             <div className="mx-auto w-full max-w-sm space-y-2">
