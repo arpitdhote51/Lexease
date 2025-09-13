@@ -1,4 +1,3 @@
-// interactive-qa.ts
 'use server';
 
 /**
@@ -19,11 +18,17 @@ const InteractiveQAInputSchema = z.object({
 export type InteractiveQAInput = z.infer<typeof InteractiveQAInputSchema>;
 
 const InteractiveQAOutputSchema = z.object({
-  answer: z.string().describe('The answer to the user question based on the document content.'),
+  answer: z
+    .string()
+    .describe(
+      'The answer to the user question based on the document content.'
+    ),
 });
 export type InteractiveQAOutput = z.infer<typeof InteractiveQAOutputSchema>;
 
-export async function interactiveQA(input: InteractiveQAInput): Promise<InteractiveQAOutput> {
+export async function interactiveQA(
+  input: InteractiveQAInput
+): Promise<InteractiveQAOutput> {
   return interactiveQAFlow(input);
 }
 
@@ -38,7 +43,7 @@ const prompt = ai.definePrompt({
   {{{documentText}}}
 
   Question:
-  {{question}}
+  {{{question}}}
 
   Answer:
   `,

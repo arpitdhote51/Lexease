@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -13,22 +12,22 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const RiskFlaggingInputSchema = z.object({
-  documentDataUri: z
-    .string()
-    .describe(
-      "The document to analyze, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
-    ),
+  documentText: z.string().describe('The text of the document to analyze.'),
 });
 export type RiskFlaggingInput = z.infer<typeof RiskFlaggingInputSchema>;
 
 const RiskFlaggingOutputSchema = z.object({
   riskyClauses: z
     .array(z.string())
-    .describe('An array of potentially risky or unusual clauses identified in the legal text.'),
+    .describe(
+      'An array of potentially risky or unusual clauses identified in the legal text.'
+    ),
 });
 export type RiskFlaggingOutput = z.infer<typeof RiskFlaggingOutputSchema>;
 
-export async function riskFlagging(input: RiskFlaggingInput): Promise<RiskFlaggingOutput> {
+export async function riskFlagging(
+  input: RiskFlaggingInput
+): Promise<RiskFlaggingOutput> {
   return riskFlaggingFlow(input);
 }
 
@@ -41,7 +40,7 @@ const riskFlaggingPrompt = ai.definePrompt({
   Analyze the following legal text and identify any clauses that could be problematic, unusual, or create a potential risk for the user. Provide a list of the risky clauses.
 
   Legal Text:
-  {{media url=documentDataUri}}
+  {{{documentText}}}
 
   Return only a list of the potentially risky clauses in the structured JSON format.
   `,

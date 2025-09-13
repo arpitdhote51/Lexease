@@ -12,6 +12,7 @@ import { collection, addDoc, serverTimestamp, doc, updateDoc, onSnapshot } from 
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 
+import { extractTextFromDocument } from "@/ai/flows/extract-text";
 import { plainLanguageSummarization } from "@/ai/flows/plain-language-summary";
 import { keyEntityRecognition, KeyEntity } from "@/ai/flows/key-entity-recognition";
 import { riskFlagging } from "@/ai/flows/risk-flagging";
@@ -150,11 +151,16 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
         
         router.push(`/${newId}`, { scroll: false }); 
 
+        // 1. Extract Text
+        const { documentText } = await extractTextFromDocument({ documentDataUri: dataUri });
+        await updateDoc(doc(db, "documents", newId), { documentText });
+
         toast({ title: "Analysis Started", description: "Your document analysis is running. Results will appear here shortly." });
         
-        runSummarization(newId, dataUri, userRole);
-        runEntityRecognition(newId, dataUri);
-        runRiskFlagging(newId, dataUri);
+        // 2. Run analysis flows in parallel
+        runSummarization(newId, documentText, userRole);
+        runEntityRecognition(newId, documentText);
+        runRiskFlagging(newId, documentText);
         
     } catch (error) {
         console.error("Failed to save or analyze document:", error);
@@ -163,24 +169,19 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
     }
   };
 
-  const runSummarization = async (docId: string, documentDataUri: string, role: UserRole) => {
+  const runSummarization = async (docId: string, documentText: string, role: UserRole) => {
     try {
-      const result = await plainLanguageSummarization({ documentDataUri, userRole: role });
-      // We also save the extracted text from the summary to use in the QA chat.
-      const textUpdate = { 
-        "analysis.summary": result,
-        documentText: result.plainLanguageSummary 
-      };
-      await updateDoc(doc(db, "documents", docId), textUpdate);
+      const result = await plainLanguageSummarization({ documentText, userRole: role });
+      await updateDoc(doc(db, "documents", docId), { "analysis.summary": result });
     } catch (e) {
       console.error("Summarization failed", e);
       toast({variant: "destructive", title: "Summarization Failed"});
     }
   };
 
-  const runEntityRecognition = async (docId: string, documentDataUri: string) => {
+  const runEntityRecognition = async (docId: string, documentText: string) => {
     try {
-      const result = await keyEntityRecognition({ documentDataUri });
+      const result = await keyEntityRecognition({ documentText });
       await updateDoc(doc(db, "documents", docId), { "analysis.entities": result });
     } catch (e) {
       console.error("Entity Recognition failed", e);
@@ -188,9 +189,9 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
     }
   };
 
-  const runRiskFlagging = async (docId: string, documentDataUri: string) => {
+  const runRiskFlagging = async (docId: string, documentText: string) => {
     try {
-      const result = await riskFlagging({ documentDataUri });
+      const result = await riskFlagging({ documentText });
       await updateDoc(doc(db, "documents", docId), { "analysis.risks": result });
     } catch (e) {
       console.error("Risk Flagging failed", e);

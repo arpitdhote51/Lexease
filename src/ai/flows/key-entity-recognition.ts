@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -14,26 +13,32 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const KeyEntityRecognitionInputSchema = z.object({
-  documentDataUri: z
-    .string()
-    .describe(
-      "The document to analyze, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
-    ),
+  documentText: z.string().describe('The text of the document to analyze.'),
 });
-export type KeyEntityRecognitionInput = z.infer<typeof KeyEntityRecognitionInputSchema>;
+export type KeyEntityRecognitionInput = z.infer<
+  typeof KeyEntityRecognitionInputSchema
+>;
 
 const KeyEntitySchema = z.object({
-      type: z.string().describe('The type of entity (e.g., party, date, location).'),
-      value: z.string().describe('The actual text of the entity.'),
-    });
+  type: z
+    .string()
+    .describe('The type of entity (e.g., party, date, location).'),
+  value: z.string().describe('The actual text of the entity.'),
+});
 export type KeyEntity = z.infer<typeof KeyEntitySchema>;
 
 const KeyEntityRecognitionOutputSchema = z.object({
-  entities: z.array(KeyEntitySchema).describe('A list of key entities identified in the document.'),
+  entities: z
+    .array(KeyEntitySchema)
+    .describe('A list of key entities identified in the document.'),
 });
-export type KeyEntityRecognitionOutput = z.infer<typeof KeyEntityRecognitionOutputSchema>;
+export type KeyEntityRecognitionOutput = z.infer<
+  typeof KeyEntityRecognitionOutputSchema
+>;
 
-export async function keyEntityRecognition(input: KeyEntityRecognitionInput): Promise<KeyEntityRecognitionOutput> {
+export async function keyEntityRecognition(
+  input: KeyEntityRecognitionInput
+): Promise<KeyEntityRecognitionOutput> {
   return keyEntityRecognitionFlow(input);
 }
 
@@ -46,7 +51,7 @@ const keyEntityRecognitionPrompt = ai.definePrompt({
   The entities should include parties involved, dates, locations, and other relevant information.
 
   Document:
-  {{media url=documentDataUri}}
+  {{{documentText}}}
 
   Please provide the output in the structured JSON format.
 `,
