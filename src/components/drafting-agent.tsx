@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Textarea } from "./ui/textarea";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { draftDocument } from "@/ai/flows/draft-document";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "./ui/skeleton";
+import jsPDF from 'jspdf';
 
 export default function DraftingAgent() {
   const [documentType, setDocumentType] = useState("");
@@ -52,7 +53,7 @@ export default function DraftingAgent() {
   };
 
   const handleDownloadTxt = () => {
-    const blob = new Blob([generatedDraft], { type: 'text/plain' });
+    const blob = new Blob([generatedDraft], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -61,6 +62,12 @@ export default function DraftingAgent() {
     URL.revokeObjectURL(url);
   };
   
+  const handleDownloadPdf = () => {
+    const doc = new jsPDF();
+    doc.text(generatedDraft, 10, 10);
+    doc.save(`${documentType.replace(/[\s/]/g, "_")}_${language}.pdf`);
+  };
+
   return (
     <main className="flex-1 p-10 overflow-y-auto">
         <header className="mb-10">
@@ -146,7 +153,7 @@ export default function DraftingAgent() {
                                 <Textarea value={generatedDraft} readOnly rows={15} className="bg-background"/>
                                 <div className="flex gap-4">
                                      <Button onClick={handleDownloadTxt} variant="outline">Download .txt</Button>
-                                     <Button disabled variant="outline">Download .pdf (Coming Soon)</Button>
+                                     <Button onClick={handleDownloadPdf} variant="outline">Download .pdf</Button>
                                 </div>
                             </div>
                         )}

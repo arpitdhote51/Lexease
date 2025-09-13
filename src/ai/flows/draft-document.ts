@@ -10,6 +10,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { Storage } from '@google-cloud/storage';
 
 const DraftDocumentInputSchema = z.object({
   documentType: z.string().describe('The type of legal document to draft (e.g., "Simple Affidavit").'),
@@ -23,80 +24,53 @@ const DraftDocumentOutputSchema = z.object({
 });
 export type DraftDocumentOutput = z.infer<typeof DraftDocumentOutputSchema>;
 
-
-// Tool to find relevant legal templates.
-// This is a simplified version that returns a hardcoded template to ensure functionality.
+// Tool to find relevant legal templates from GCS.
 const findRelevantTemplates = ai.defineTool(
-    {
-      name: 'findRelevantTemplates',
-      description: 'Retrieves a basic template for a given legal document type.',
-      inputSchema: z.object({
-        documentType: z.string().describe('The type of document to search for (e.g., "Affidavit", "Agreement").'),
-        language: z.string().describe('The language of the template required.'),
-      }),
-      outputSchema: z.object({
-        template: z.string().describe('The content of the legal template.'),
-      }),
-    },
-    async ({ documentType, language }) => {
-      console.log(`Providing hardcoded template for: ${documentType} in ${language}`);
-      // Return a very basic, generic template based on the type.
-      // This bypasses GCS to ensure the feature works.
-      let template = '';
-      if (documentType.toLowerCase().includes('affidavit')) {
-        template = `
-          BEFORE THE NOTARY PUBLIC AT [City]
-          
-          AFFIDAVIT
-          
-          I, [Full Name], son/daughter of [Father's Name], aged [Age], residing at [Full Address], do hereby solemnly affirm and declare as under:
-          
-          1. That I am the deponent herein and a citizen of India.
-          2. That the facts stated in this affidavit are true to my knowledge.
-          
-          [Add user-provided details here...]
+  {
+    name: 'findRelevantTemplates',
+    description: 'Retrieves a template from Google Cloud Storage for a given legal document type.',
+    inputSchema: z.object({
+      documentType: z.string().describe('The type of document to search for (e.g., "Affidavit").'),
+      language: z.string().describe('The language of the template required.'),
+    }),
+    outputSchema: z.object({
+      template: z.string().describe('The content of the legal template.'),
+    }),
+  },
+  async ({ documentType, language }) => {
+    const storage = new Storage();
+    const bucketName = 'legal_drafts';
+    
+    // Simplified path for now to ensure connectivity.
+    // E.g., legal_drafts/english_drafts/Affidavit.txt
+    const filePath = `${language.toLowerCase()}_drafts/Affidavit.txt`;
+    
+    console.log(`Attempting to read from GCS: gs://${bucketName}/${filePath}`);
 
-          DEPONENT
-          
-          VERIFICATION
-          Verified at [Place] on this [Date] that the contents of the above affidavit are true and correct to the best of my knowledge and belief.
-          
-          DEPONENT
-        `;
-      } else if (documentType.toLowerCase().includes('agreement')) {
-        template = `
-          AGREEMENT
-          
-          This Agreement is made and entered into on this [Date] by and between:
-          
-          [Party A Name], having its principal place of business at [Party A Address] (hereinafter referred to as "Party A"),
-          
-          AND
-          
-          [Party B Name], having its principal place of business at [Party B Address] (hereinafter referred to as "Party B").
-          
-          [Add user-provided details about the agreement clauses here...]
-          
-          IN WITNESS WHEREOF, the parties have executed this Agreement as of the date first above written.
-          
-          PARTY A: _________________
-          PARTY B: _________________
-        `;
-      } else { // Fallback for Bail or other types
-         template = `
-          BEFORE THE COURT OF [Court Name] AT [City]
-          
-          APPLICATION FOR [Document Type]
-          
-          [Add user-provided details here...]
+    try {
+      const bucket = storage.bucket(bucketName);
+      const file = bucket.file(filePath);
+      
+      const [exists] = await file.exists();
+      if (!exists) {
+        throw new Error(`File not found at path: ${filePath}`);
+      }
 
-          APPLICANT
-         `;
+      const [content] = await file.download();
+      const template = content.toString('utf8');
+      
+      if (!template) {
+          throw new Error('Template file is empty.');
       }
 
       return { template };
+    } catch (error) {
+      console.error(`Failed to read from GCS bucket "${bucketName}":`, error);
+      throw new Error(`Could not retrieve template for "${documentType}" in ${language}.`);
     }
+  }
 );
+
 
 // Agentic prompt that uses the tool
 const draftingAgentPrompt = ai.definePrompt({
@@ -134,7 +108,9 @@ const draftDocumentFlow = ai.defineFlow(
     outputSchema: DraftDocumentOutputSchema,
   },
   async (input) => {
-    const { output } = await draftingAgentPrompt(input);
+    // For now, we only support Affidavit to test the GCS connection.
+    const flowInput = { ...input, documentType: 'Affidavit' };
+    const { output } = await draftingAgentPrompt(flowInput);
     return output!;
   }
 );
