@@ -80,16 +80,15 @@ const findRelevantTemplates = ai.defineTool(
         
         // Find the best match based on the document type (filename)
         // This is a simple string search; can be improved with more advanced matching
-        const bestMatch = files.find(file => file.name.toLowerCase().includes(documentType.toLowerCase()));
+        let bestMatch = files.find(file => file.name.toLowerCase().includes(documentType.toLowerCase()));
 
         if (!bestMatch) {
             console.warn(`No specific match for "${documentType}". Falling back to the first available template.`);
-            const fallbackFile = files.find(f => f.name.endsWith('.docx') || f.name.endsWith('.pdf') || f.name.endsWith('.txt'));
-            if (!fallbackFile) throw new Error('No valid template files found.');
+            bestMatch = files.find(f => f.name.endsWith('.docx') || f.name.endsWith('.pdf') || f.name.endsWith('.txt'));
             
-            const [contents] = await fallbackFile.download();
-            const template = await extractText(contents, fallbackFile.name);
-            return { template };
+            if (!bestMatch) {
+                throw new Error('No valid template files found in the specified language folder.');
+            }
         }
         
         const [contents] = await bestMatch.download();
