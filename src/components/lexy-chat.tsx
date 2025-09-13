@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -28,7 +27,7 @@ export default function LexyChat() {
       setMessages([
         {
           role: "assistant",
-          content: "Hello! I'm Lexy, your AI legal assistant. Ask me any general legal question.",
+          content: "Hello! I'm Lexy, your AI legal assistant. Ask me any general legal question about Indian law.",
         },
       ]);
     }
@@ -37,7 +36,10 @@ export default function LexyChat() {
   const scrollToBottom = useCallback(() => {
     if (scrollAreaRef.current) {
         setTimeout(() => {
-            scrollAreaRef.current!.scrollTo({ top: scrollAreaRef.current!.scrollHeight, behavior: 'smooth' });
+            const viewport = scrollAreaRef.current.querySelector('div');
+            if (viewport) {
+                viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
+            }
         }, 100);
     }
   }, []);
@@ -65,25 +67,20 @@ export default function LexyChat() {
     } catch (error) {
         console.error("General Q&A failed:", error);
         toast({ variant: "destructive", title: "Error", description: "Could not get an answer. Please try again." });
-        // Optionally remove the user's message on failure
-        // setMessages(prev => prev.slice(0, -1)); 
+        setMessages(prev => prev.slice(0, -1));
     } finally {
         setIsLoading(false);
     }
   };
 
   return (
-    <Card className="h-[450px] w-full max-w-md flex flex-col bg-white shadow-2xl rounded-2xl border-border">
-      <CardHeader className="text-center">
-        <CardTitle className="font-bold text-lg text-primary">Ask Lexy</CardTitle>
-      </CardHeader>
-      <CardContent className="flex-1 flex flex-col gap-4 overflow-hidden">
-        <ScrollArea className="flex-1 pr-4 -mr-4" ref={scrollAreaRef}>
-          <div className="space-y-4">
+    <div className="h-[60vh] w-full flex flex-col bg-white/50 shadow-lg rounded-2xl border border-border/50 backdrop-blur-sm">
+        <ScrollArea className="flex-1 p-6" ref={scrollAreaRef}>
+          <div className="space-y-6">
             {messages.map((message, index) => (
               <div
                 key={`msg-${index}`}
-                className={`flex items-start gap-3 ${
+                className={`flex items-start gap-4 text-left ${
                   message.role === "user" ? "justify-end" : ""
                 }`}
               >
@@ -93,10 +90,10 @@ export default function LexyChat() {
                   </Avatar>
                 )}
                 <div
-                  className={`rounded-lg p-3 max-w-xs text-sm ${
+                  className={`rounded-lg px-4 py-3 max-w-2xl text-sm shadow-md ${
                     message.role === "user"
                       ? "bg-primary text-primary-foreground"
-                      : "bg-background"
+                      : "bg-background/80"
                   }`}
                 >
                   <p className="whitespace-pre-wrap font-body leading-relaxed">{message.content}</p>
@@ -104,11 +101,11 @@ export default function LexyChat() {
               </div>
             ))}
             {isLoading && (
-                 <div className="flex items-start gap-3">
+                 <div className="flex items-start gap-4 text-left">
                     <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
                         <AvatarFallback><Bot size={20} /></AvatarFallback>
                     </Avatar>
-                    <div className="rounded-lg p-3 max-w-sm bg-background flex items-center space-x-2">
+                    <div className="rounded-lg px-4 py-3 max-w-sm bg-background/80 shadow-md flex items-center space-x-2">
                         <span className="h-2 w-2 bg-foreground/50 rounded-full animate-pulse [animation-delay:-0.3s]"></span>
                         <span className="h-2 w-2 bg-foreground/50 rounded-full animate-pulse [animation-delay:-0.15s]"></span>
                         <span className="h-2 w-2 bg-foreground/50 rounded-full animate-pulse"></span>
@@ -117,19 +114,20 @@ export default function LexyChat() {
             )}
           </div>
         </ScrollArea>
-        <form onSubmit={handleSubmit} className="flex gap-2 border-t pt-4">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask a legal question..."
-            disabled={isLoading}
-            className="text-base"
-          />
-          <Button type="submit" disabled={isLoading || !input.trim()} className="bg-accent hover:bg-accent/90">
-            <Send className="h-4 w-4" />
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+        <div className="border-t p-4 bg-background/20 rounded-b-2xl">
+            <form onSubmit={handleSubmit} className="flex gap-2">
+              <Input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Ask a question about Indian Law..."
+                disabled={isLoading}
+                className="text-base h-12 flex-1"
+              />
+              <Button type="submit" disabled={isLoading || !input.trim()} className="bg-accent hover:bg-accent/90 h-12 px-6">
+                <Send className="h-5 w-5" />
+              </Button>
+            </form>
+        </div>
+    </div>
   );
 }

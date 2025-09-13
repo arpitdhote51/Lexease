@@ -59,30 +59,18 @@ export default function HomePage() {
       </header>
 
       <main className="flex-1">
-        <section className="w-full py-12 md:py-24 lg:py-32 bg-gradient-to-br from-primary/5 via-background to-background">
-          <div className="container px-4 md:px-6">
-            <div className="grid gap-8 lg:grid-cols-2 lg:gap-16">
-              <div className="flex flex-col justify-center space-y-6">
-                <div className="space-y-4">
-                  <h1 className="text-4xl font-bold tracking-tighter text-primary sm:text-5xl xl:text-6xl/none font-headline">
-                    Your AI-Powered Legal Co-Pilot for Indian Law
-                  </h1>
-                  <p className="max-w-[600px] text-muted-foreground md:text-xl">
-                    LexEase is a highly capable AI legal assistant designed for Indian legal professionals, equipped with a comprehensive, up-to-date knowledge base and advanced analytical capabilities.
-                  </p>
-                </div>
-                <div className="flex flex-col gap-2 min-[400px]:flex-row">
-                  <Button asChild size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
-                    <Link href="/new">
-                      Start Your Legal Analysis
-                      <ArrowRight className="ml-2 h-5 w-5" />
-                    </Link>
-                  </Button>
-                </div>
-              </div>
-              <div className="flex items-center justify-center">
-                 <LexyChat />
-              </div>
+        <section className="w-full py-12 md:py-24 lg:py-28 bg-gradient-to-br from-primary/5 via-background to-background">
+          <div className="container px-4 md:px-6 flex flex-col items-center text-center">
+            <div className="space-y-4 max-w-3xl">
+              <h1 className="text-4xl font-bold tracking-tighter text-primary sm:text-5xl xl:text-6xl/none font-headline">
+                Your AI-Powered Legal Co-Pilot for Indian Law
+              </h1>
+              <p className="text-muted-foreground md:text-xl">
+                LexEase is a highly capable AI legal assistant designed for Indian legal professionals. Ask Lexy anything below.
+              </p>
+            </div>
+            <div className="w-full max-w-4xl mt-10">
+              <LexyChat />
             </div>
           </div>
         </section>
@@ -115,6 +103,14 @@ export default function HomePage() {
                 </Card>
               ))}
             </div>
+             <div className="text-center mt-12">
+                <Button asChild size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
+                    <Link href="/new">
+                      Analyze a Document
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Link>
+                  </Button>
+            </div>
           </div>
         </section>
 
@@ -130,8 +126,8 @@ export default function HomePage() {
             </div>
             <div className="mx-auto w-full max-w-sm space-y-2">
               <Button asChild size="lg" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
-                <Link href="/new">
-                  Analyze Your First Document
+                <Link href="/draft">
+                  Draft a New Document
                 </Link>
               </Button>
             </div>
