@@ -65,24 +65,29 @@ const findRelevantTemplates = ai.defineTool(
       console.warn(`Could not retrieve template from GCS. Falling back to basic template. Error:`, error);
       // Fallback to a basic template if GCS fails
       const fallbackTemplate = `
-        BEFORE THE HON'BLE [Court Name]
-        AT [City]
-        
-        AFFIDAVIT
-        
-        I, [Name], son of [Father's Name], aged [Age], residing at [Address], do hereby solemnly affirm and state as follows:
-        
-        1. That I am the deponent herein and am fully conversant with the facts of the case.
-        
-        2. That the statements made in the accompanying application are true and correct to the best of my knowledge and belief.
-        
-        [User-provided details will be inserted here by the AI]
+        Format for Affidavit:
+        (To be Printed in a Rs. 20 Stamp Paper)
 
-        DEPONENT
+        AFFIDAVIT OF [Mr./Ms./Mrs. Name]
+
+        I, [Name], S/o, D/o [Father's Name], aged about [Age] years and residing at [Address], do hereby solemnly affirm and sincerely state as follows:
+
+        I state that I have lost my [Degree/Certificate Type] degree certificate/Grade sheets/Consolidated Grade Sheet, Certificate Serial No's are [Certificate Serial Numbers], Registration No. [Registration Number] given in the year [Year of Issue] and if I do manage to recover or find the original certificate, I shall return the duplicate certificate to the concerned authorities at [Name of Institution], [Location of Institution].
+
+        The above mentioned facts are true and correct to the best of my knowledge, information and belief.
+
+
+        Signature of the Deponent
+
+
+        Solemnly affirmed at [Place of Affirmation]
+        On this [Day] day of [Month]
+
+        Deponent signed before me
+
+        And signed his/her name in my presence
         
-        VERIFICATION
-        
-        Verified at [City] on this [Date] day of [Month], [Year], that the contents of the above affidavit are true and correct to my knowledge.
+        Seal of the Notary
       `;
       return { template: fallbackTemplate };
     }
@@ -100,7 +105,7 @@ const draftingAgentPrompt = ai.definePrompt({
         Your task is to generate a formal legal document based on user-provided details.
 
         1. First, use the 'findRelevantTemplates' tool to retrieve the appropriate template for the requested document type and language.
-        2. Once you have the template, carefully integrate the user-provided details into it. Fill in all placeholders like [Name], [Age], [Address], etc., with the information from the user's input. The user's input may not be structured, so intelligently extract the information.
+        2. Once you have the template, carefully integrate the user-provided details into it. Fill in all placeholders like [Name], [Age], [Address], [Degree/Certificate Type], [Registration Number], etc., with the information from the user's input. The user's input may not be structured, so intelligently extract the information.
         3. Ensure the final document is coherent, complete, and professionally formatted based on the structure of the retrieved template.
 
         USER-PROVIDED DETAILS:
