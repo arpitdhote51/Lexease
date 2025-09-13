@@ -13,7 +13,11 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const PlainLanguageSummarizationInputSchema = z.object({
-  legalDocumentText: z.string().describe('The text of the legal document to summarize.'),
+  documentDataUri: z
+    .string()
+    .describe(
+      "The document to analyze, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+    ),
   userRole: z
     .enum(['lawyer', 'lawStudent', 'layperson'])
     .describe(
@@ -48,7 +52,7 @@ const prompt = ai.definePrompt({
 
   User Role: {{{userRole}}}
   Legal Document:
-  {{{legalDocumentText}}}
+  {{media url=documentDataUri}}
 
   Please provide only the summary in the structured JSON format.`,
 });

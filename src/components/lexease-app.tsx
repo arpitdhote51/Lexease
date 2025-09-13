@@ -11,7 +11,6 @@ import { db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp, doc, updateDoc, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
-import mammoth from "mammoth";
 
 import { plainLanguageSummarization } from "@/ai/flows/plain-language-summary";
 import { keyEntityRecognition, KeyEntity } from "@/ai/flows/key-entity-recognition";
@@ -42,6 +41,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
   const router = useRouter();
   const [document, setDocument] = useState<DocumentData | null>(initialDocument || null);
   const [documentText, setDocumentText] = useState(initialDocument?.documentText || "");
+  const [documentDataUri, setDocumentDataUri] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<UserRole>("layperson");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -70,14 +70,12 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
         const data = doc.data() as DocumentData;
         setDocument({ ...data, id: doc.id });
         
-        // Only update text if it's different, to avoid overwriting state
         if (data.documentText && data.documentText !== documentText) {
           setDocumentText(data.documentText);
         }
         
         if (data.analysis) {
             setAnalysisResult(data.analysis);
-            // Determine if analysis is complete
             if (data.analysis.summary && data.analysis.entities && data.analysis.risks) {
                 setIsAnalyzing(false);
             }
@@ -107,10 +105,9 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
     setAnalysisResult(null); // Reset previous results
 
     try {
-      const text = await extractText(file);
-      setDocumentText(text);
-      // After extracting text, we create the document and start analysis
-      await saveInitialDocumentAndAnalyze(file.name, text);
+      const dataUri = await fileToDataUri(file);
+      setDocumentDataUri(dataUri);
+      await saveInitialDocumentAndAnalyze(file.name, dataUri);
     } catch (error) {
       handleFileError(error, file.type);
     } finally {
@@ -118,38 +115,16 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
     }
   };
   
-  const extractText = async (file: File): Promise<string> => {
+  const fileToDataUri = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            try {
-                if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
-                    const arrayBuffer = e.target?.result as ArrayBuffer;
-                    const result = await mammoth.extractRawText({ arrayBuffer });
-                    resolve(result.value);
-                } else if (file.type === "text/plain") {
-                    const text = e.target?.result as string;
-                    resolve(text);
-                } else {
-                   reject(new Error("Unsupported file type. Please upload a .docx or .txt file."));
-                }
-            } catch (error) {
-                reject(error);
-            }
-        };
-
-        reader.onerror = (error) => reject(error);
-
-         if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
-            reader.readAsArrayBuffer(file);
-        } else if (file.type === "text/plain") {
-            reader.readAsText(file);
-        }
-        else {
-            reject(new Error("Unsupported file type. Please upload a .docx or .txt file."));
-        }
+      const reader = new FileReader();
+      reader.onload = () => {
+        resolve(reader.result as string);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
     });
-};
+  };
 
   const handleFileError = (error: any, type: string) => {
     console.error(`File processing error (${type}):`, error);
@@ -159,7 +134,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
     setIsAnalyzing(false);
   }
 
-  const saveInitialDocumentAndAnalyze = async (fileName: string, extractedText: string) => {
+  const saveInitialDocumentAndAnalyze = async (fileName: string, dataUri: string) => {
     if (!user) return;
     
     setIsAnalyzing(true);
@@ -168,22 +143,20 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
         const newDocRef = await addDoc(collection(db, 'documents'), {
             userId: user.uid,
             fileName: fileName,
-            documentText: extractedText,
+            documentText: "", // Keep this for QA for now
             createdAt: serverTimestamp(),
             analysis: {},
         });
         const newId = newDocRef.id;
         setDocumentId(newId);
         
-        // Navigate to the new page, but don't block
         router.push(`/${newId}`, { scroll: false }); 
 
         toast({ title: "Analysis Started", description: "Your document analysis is running. Results will appear here shortly." });
         
-        // Run all analysis tasks in parallel, but don't wait for them to finish here
-        runSummarization(newId, extractedText);
-        runEntityRecognition(newId, extractedText);
-        runRiskFlagging(newId, extractedText);
+        runSummarization(newId, dataUri);
+        runEntityRecognition(newId, dataUri);
+        runRiskFlagging(newId, dataUri);
         
     } catch (error) {
         console.error("Failed to save or analyze document:", error);
@@ -192,19 +165,24 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
     }
   };
 
-  const runSummarization = async (docId: string, text: string) => {
+  const runSummarization = async (docId: string, dataUri: string) => {
     try {
-      const result = await plainLanguageSummarization({ legalDocumentText: text, userRole });
-      await updateDoc(doc(db, "documents", docId), { "analysis.summary": result });
+      const result = await plainLanguageSummarization({ documentDataUri: dataUri, userRole });
+      // We also save the extracted text from the summary to use in the QA chat.
+      const textUpdate = { 
+        "analysis.summary": result,
+        documentText: result.plainLanguageSummary 
+      };
+      await updateDoc(doc(db, "documents", docId), textUpdate);
     } catch (e) {
       console.error("Summarization failed", e);
       toast({variant: "destructive", title: "Summarization Failed"});
     }
   };
 
-  const runEntityRecognition = async (docId: string, text: string) => {
+  const runEntityRecognition = async (docId: string, dataUri: string) => {
     try {
-      const result = await keyEntityRecognition({ documentText: text });
+      const result = await keyEntityRecognition({ documentDataUri: dataUri });
       await updateDoc(doc(db, "documents", docId), { "analysis.entities": result });
     } catch (e) {
       console.error("Entity Recognition failed", e);
@@ -212,9 +190,9 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
     }
   };
 
-  const runRiskFlagging = async (docId: string, text: string) => {
+  const runRiskFlagging = async (docId: string, dataUri: string) => {
     try {
-      const result = await riskFlagging({ legalDocumentText: text });
+      const result = await riskFlagging({ documentDataUri: dataUri });
       await updateDoc(doc(db, "documents", docId), { "analysis.risks": result });
     } catch (e) {
       console.error("Risk Flagging failed", e);
@@ -272,7 +250,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
                     type="file"
                     className="sr-only"
                     onChange={handleFileChange}
-                    accept=".docx,.txt"
+                    accept=".docx,.txt,.pdf"
                     disabled={isLoading}
                 />
                 {isProcessing || (isAnalyzing && !documentId) ? (
@@ -293,7 +271,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
                             Drag & drop or click to upload
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                            DOCX or TXT
+                            DOCX, TXT, or PDF
                         </p>
                     </label>
                 )}
@@ -351,7 +329,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
                     <TabsTrigger value="summary" disabled={!analysisResult?.summary}>Summary</TabsTrigger>
                     <TabsTrigger value="entities" disabled={!analysisResult?.entities}>Key Entities</TabsTrigger>
                     <TabsTrigger value="risks" disabled={!analysisResult?.risks}>Risk Flags</TabsTrigger>
-                    <TabsTrigger value="qa">Q&A</TabsTrigger>
+                    <TabsTrigger value="qa">Q&amp;A</TabsTrigger>
                   </TabsList>
                   
                   <TabsContent value="summary">

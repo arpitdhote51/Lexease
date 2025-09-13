@@ -19,7 +19,11 @@ import {
 import { auth, db } from "@/lib/firebase";
 import { doc, setDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
-import { AuthFormValues } from "@/app/auth/page";
+
+export interface AuthFormValues {
+  email: string;
+  password?: string;
+}
 
 interface AuthContextType {
   user: User | null;
@@ -60,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [authEnabled]);
 
   const signIn = async (data: AuthFormValues) => {
-    if (!authEnabled) return;
+    if (!authEnabled || !data.password) return;
     try {
       const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
       if (!userCredential.user.emailVerified) {
@@ -87,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUp = async (data: AuthFormValues) => {
-    if (!authEnabled) return;
+    if (!authEnabled || !data.password) return;
     try {
       const userCredential = await createUserWithEmailAndPassword(
         auth,

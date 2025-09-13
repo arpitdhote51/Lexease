@@ -7,9 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Send, User, Bot } from "lucide-react";
+import { Send, User, Bot, Mic, Volume2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { interactiveQA, InteractiveQAInput } from "@/ai/flows/interactive-qa";
+import { textToSpeech } from "@/ai/flows/text-to-speech";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "firebase/firestore";
 
@@ -29,8 +30,14 @@ export default function QAChat({ documentText, documentId }: QAChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isRecognizing, setIsRecognizing] = useState(false);
+  const [audioPlaying, setAudioPlaying] = useState<string | null>(null);
+  const [audioLoading, setAudioLoading] = useState<string | null>(null);
+  const recognitionRef = useRef<any>(null);
+
   const { toast } = useToast();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const scrollToBottom = useCallback(() => {
     if (scrollAreaRef.current) {
@@ -55,11 +62,7 @@ export default function QAChat({ documentText, documentId }: QAChatProps) {
       scrollToBottom();
     }, (error) => {
       console.error("Error fetching chat history: ", error);
-      // If the collection doesn't exist, it might throw an error.
-      // We can ignore this for a new document.
-      if (error.code === 'failed-precondition') {
-          console.log("Chat history collection doesn't exist yet.");
-      } else {
+      if (error.code !== 'failed-precondition') {
           toast({
               variant: "destructive",
               title: "Error",
@@ -76,39 +79,91 @@ export default function QAChat({ documentText, documentId }: QAChatProps) {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
+  const handlePlayAudio = async (text: string, messageId: string) => {
+    if (audioPlaying === messageId) {
+        audioRef.current?.pause();
+        setAudioPlaying(null);
+        return;
+    }
+    
+    setAudioLoading(messageId);
+    try {
+        const { audioDataUri } = await textToSpeech({ text });
+        if (audioRef.current) {
+            audioRef.current.src = audioDataUri;
+            audioRef.current.play();
+            setAudioPlaying(messageId);
+            audioRef.current.onended = () => setAudioPlaying(null);
+        }
+    } catch (error) {
+        console.error("TTS failed:", error);
+        toast({ variant: "destructive", title: "Audio Playback Failed" });
+    } finally {
+        setAudioLoading(null);
+    }
+  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
+  const startRecognition = () => {
+    if (recognitionRef.current) {
+        recognitionRef.current.stop();
+        setIsRecognizing(false);
+        recognitionRef.current = null;
+        return;
+    }
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        toast({ variant: 'destructive', title: 'Speech recognition not supported' });
+        return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
 
-    const userMessage: Message = { role: "user", content: input, timestamp: serverTimestamp() };
+    recognition.onstart = () => setIsRecognizing(true);
+    recognition.onend = () => {
+        setIsRecognizing(false);
+        recognitionRef.current = null;
+    };
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error', event.error);
+      toast({ variant: 'destructive', title: 'Speech Recognition Error' });
+    };
+
+    recognition.onresult = (event) => {
+        const transcript = Array.from(event.results).map(result => result[0]).map(result => result.transcript).join('');
+        setInput(transcript);
+        if (event.results[0].isFinal) {
+           handleSubmit(undefined, transcript);
+        }
+    };
+    
+    recognition.start();
+    recognitionRef.current = recognition;
+  };
+
+  const handleSubmit = async (e?: React.FormEvent, voiceInput?: string) => {
+    e?.preventDefault();
+    const currentInput = voiceInput || input;
+    if (!currentInput.trim() || isLoading) return;
+
+    const userMessage: Message = { role: "user", content: currentInput, timestamp: serverTimestamp() };
     
     setInput("");
     setIsLoading(true);
 
     try {
         const messagesCol = collection(db, "documents", documentId, "messages");
-        // Add user message to Firestore optimistically
         await addDoc(messagesCol, userMessage);
         
-        const qaInput: InteractiveQAInput = {
-            documentText,
-            question: input,
-        };
+        const qaInput: InteractiveQAInput = { documentText, question: currentInput };
         const result = await interactiveQA(qaInput);
         const assistantMessage: Message = { role: "assistant", content: result.answer, timestamp: serverTimestamp() };
 
-        // Add assistant message to Firestore
         await addDoc(messagesCol, assistantMessage);
-
     } catch (error) {
         console.error("Q&A failed:", error);
-        toast({
-            variant: "destructive",
-            title: "Error",
-            description: "Could not get an answer. Please try again."
-        });
-        // This is a simplified rollback. For a real-world app, you might want a more robust solution.
+        toast({ variant: "destructive", title: "Error", description: "Could not get an answer. Please try again." });
         setMessages(prev => prev.filter(msg => msg.content !== userMessage.content || msg.role !== 'user' ));
     } finally {
         setIsLoading(false);
@@ -118,14 +173,14 @@ export default function QAChat({ documentText, documentId }: QAChatProps) {
   return (
     <Card className="h-[70vh] flex flex-col mt-4 bg-white border-border shadow-none">
       <CardHeader>
-        <CardTitle className="font-bold text-lg text-foreground">Interactive Q&A</CardTitle>
+        <CardTitle className="font-bold text-lg text-foreground">Interactive Q&amp;A</CardTitle>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col gap-4">
         <ScrollArea className="flex-1 pr-4 -mr-4" ref={scrollAreaRef}>
           <div className="space-y-4">
-            {messages.map((message, index) => (
+            {messages.map((message) => (
               <div
-                key={message.id || index}
+                key={message.id}
                 className={`flex items-start gap-3 ${
                   message.role === "user" ? "justify-end" : ""
                 }`}
@@ -136,13 +191,24 @@ export default function QAChat({ documentText, documentId }: QAChatProps) {
                   </Avatar>
                 )}
                 <div
-                  className={`rounded-lg p-3 max-w-lg text-sm ${
+                  className={`rounded-lg p-3 max-w-lg text-sm relative group ${
                     message.role === "user"
                       ? "bg-primary text-primary-foreground"
                       : "bg-background"
                   }`}
                 >
                   <p className="whitespace-pre-wrap font-body leading-relaxed">{message.content}</p>
+                   {message.role === "assistant" && (
+                     <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute -bottom-2 -right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => handlePlayAudio(message.content, message.id!)}
+                        disabled={audioLoading !== null}
+                    >
+                       {audioLoading === message.id ? <Loader2 className="animate-spin" /> : <Volume2 size={16} />}
+                    </Button>
+                   )}
                 </div>
                  {message.role === "user" && (
                   <Avatar className="h-8 w-8 bg-muted">
@@ -173,10 +239,14 @@ export default function QAChat({ documentText, documentId }: QAChatProps) {
             disabled={isLoading || !documentText}
             className="text-base"
           />
+          <Button type="button" variant={isRecognizing ? "destructive" : "outline"} size="icon" onClick={startRecognition} disabled={isLoading}>
+              <Mic className="h-4 w-4" />
+          </Button>
           <Button type="submit" disabled={isLoading || !input.trim()} className="bg-accent hover:bg-accent/90">
             <Send className="h-4 w-4" />
           </Button>
         </form>
+         <audio ref={audioRef} className="hidden" />
       </CardContent>
     </Card>
   );
