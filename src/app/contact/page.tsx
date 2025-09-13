@@ -59,20 +59,20 @@ export default function ContactPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-2">
                                         <Label htmlFor="name" className="text-foreground">Full Name</Label>
-                                        <Input id="name" placeholder="John Doe" />
+                                        <Input id="name" name="name" placeholder="John Doe" />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="email" className="text-foreground">Email Address</Label>
-                                        <Input id="email" type="email" placeholder="john.doe@example.com" />
+                                        <Input id="email" name="email" type="email" placeholder="john.doe@example.com" />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="subject" className="text-foreground">Subject</Label>
-                                    <Input id="subject" placeholder="Feedback on AI Analysis" />
+                                    <Input id="subject" name="subject" placeholder="Feedback on AI Analysis" />
                                 </div>
-                                <div className="space-y-2">
+                                <div className="spacey-2">
                                     <Label htmlFor="message" className="text-foreground">Message</Label>
-                                    <Textarea id="message" placeholder="Please type your message here..." rows={6} />
+                                    <Textarea id="message" name="message" placeholder="Please type your message here..." rows={6} />
                                 </div>
                                 <Button type="submit" className="w-full bg-accent text-white font-semibold py-3 rounded-lg hover:bg-accent/90">
                                     Send Message
