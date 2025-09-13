@@ -8,6 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import * as pdfjs from "pdfjs-dist";
+import mammoth from "mammoth";
+
 
 import {
   plainLanguageSummarization,
@@ -38,6 +41,9 @@ type UserRole = "layperson" | "lawStudent" | "lawyer";
 interface LexeaseAppProps {
     existingDocument?: DocumentData | null;
 }
+
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+
 
 export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
   const router = useRouter();
@@ -88,10 +94,32 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
     setIsLoading(true);
     setDocumentText('');
     const fileType = file.type;
+    const reader = new FileReader();
 
     try {
-        if (fileType === 'text/plain') {
-            const reader = new FileReader();
+        if (fileType === 'application/pdf') {
+            reader.onload = async (e) => {
+                const typedArray = new Uint8Array(e.target?.result as ArrayBuffer);
+                const pdf = await pdfjs.getDocument(typedArray).promise;
+                let text = '';
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    text += textContent.items.map((item: any) => item.str).join(' ');
+                }
+                setDocumentText(text);
+                setIsLoading(false);
+            };
+            reader.readAsArrayBuffer(file);
+        } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+             reader.onload = async (e) => {
+                const arrayBuffer = e.target?.result as ArrayBuffer;
+                const result = await mammoth.extractRawText({ arrayBuffer });
+                setDocumentText(result.value);
+                setIsLoading(false);
+            };
+            reader.readAsArrayBuffer(file);
+        } else if (fileType === 'text/plain') {
             reader.onload = (e) => {
                 setDocumentText(e.target?.result as string);
                 setIsLoading(false);
@@ -101,7 +129,7 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
             toast({
                 variant: 'destructive',
                 title: 'Unsupported File Type',
-                description: 'Please upload a .TXT file.',
+                description: 'Please upload a .PDF, .DOCX, or .TXT file.',
             });
             setFile(null);
             setIsLoading(false);
@@ -209,7 +237,7 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
                     type="file"
                     className="sr-only"
                     onChange={handleFileChange}
-                    accept=".txt"
+                    accept=".pdf,.docx,.txt"
                     disabled={isLoading || !!existingDocument}
                 />
                 {file ? (
@@ -239,7 +267,7 @@ export default function LexeaseApp({ existingDocument }: LexeaseAppProps) {
                             Drag & drop or click to upload
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                            TXT files only
+                            PDF, DOCX, or TXT files
                         </p>
                     </label>
                 )}
