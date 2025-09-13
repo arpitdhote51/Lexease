@@ -41,13 +41,10 @@ const findRelevantTemplates = ai.defineTool(
     const storage = new Storage();
     const bucketName = 'legal_drafts';
     
-    // Simplified path for now to ensure connectivity.
-    // E.g., legal_drafts/english_drafts/Affidavit.txt
     const filePath = `${language.toLowerCase()}_drafts/Affidavit.txt`;
     
-    console.log(`Attempting to read from GCS: gs://${bucketName}/${filePath}`);
-
     try {
+      console.log(`Attempting to read from GCS: gs://${bucketName}/${filePath}`);
       const bucket = storage.bucket(bucketName);
       const file = bucket.file(filePath);
       
@@ -65,8 +62,29 @@ const findRelevantTemplates = ai.defineTool(
 
       return { template };
     } catch (error) {
-      console.error(`Failed to read from GCS bucket "${bucketName}":`, error);
-      throw new Error(`Could not retrieve template for "${documentType}" in ${language}.`);
+      console.warn(`Could not retrieve template from GCS. Falling back to basic template. Error:`, error);
+      // Fallback to a basic template if GCS fails
+      const fallbackTemplate = `
+        BEFORE THE HON'BLE [Court Name]
+        AT [City]
+        
+        AFFIDAVIT
+        
+        I, [Name], son of [Father's Name], aged [Age], residing at [Address], do hereby solemnly affirm and state as follows:
+        
+        1. That I am the deponent herein and am fully conversant with the facts of the case.
+        
+        2. That the statements made in the accompanying application are true and correct to the best of my knowledge and belief.
+        
+        [User-provided details will be inserted here by the AI]
+
+        DEPONENT
+        
+        VERIFICATION
+        
+        Verified at [City] on this [Date] day of [Month], [Year], that the contents of the above affidavit are true and correct to my knowledge.
+      `;
+      return { template: fallbackTemplate };
     }
   }
 );
@@ -82,7 +100,7 @@ const draftingAgentPrompt = ai.definePrompt({
         Your task is to generate a formal legal document based on user-provided details.
 
         1. First, use the 'findRelevantTemplates' tool to retrieve the appropriate template for the requested document type and language.
-        2. Once you have the template, carefully integrate the user-provided details into it. Fill in all placeholders like [Name], [Age], [Address], etc., with the information from the user's input.
+        2. Once you have the template, carefully integrate the user-provided details into it. Fill in all placeholders like [Name], [Age], [Address], etc., with the information from the user's input. The user's input may not be structured, so intelligently extract the information.
         3. Ensure the final document is coherent, complete, and professionally formatted based on the structure of the retrieved template.
 
         USER-PROVIDED DETAILS:
