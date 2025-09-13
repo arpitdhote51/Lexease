@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { KeyEntity } from "@/ai/flows/document-analysis";
+import { KeyEntity } from "@/ai/flows/key-entity-recognition";
 import { Users, Calendar, MapPin, Landmark, DollarSign, FileText } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 

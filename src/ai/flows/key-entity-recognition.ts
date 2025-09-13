@@ -2,59 +2,50 @@
 'use server';
 
 /**
- * @fileOverview A Genkit flow that recognizes key entities in a legal document.
+ * @fileOverview This file defines a Genkit flow for identifying key entities in a legal document.
  *
- * - keyEntityRecognition - A function that takes legal document text and returns a list of key entities.
- * - KeyEntityRecognitionInput - The input type for the keyEntityRecognition function.
- * - KeyEntityRecognitionOutput - The return type for the keyEntityRecognition function.
+ * It includes:
+ * - `identifyKeyEntities`: The main function to trigger the flow.
+ * - `KeyEntityRecognitionInput`: The input type for the flow, defining the document content.
+ * - `KeyEntityRecognitionOutput`: The output type for the flow, listing identified entities.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const KeyEntityRecognitionInputSchema = z.object({
-  legalDocumentText: z.string().describe('The text of the legal document to analyze.'),
+  documentText: z.string().describe('The text content of the legal document.'),
 });
-export type KeyEntityRecognitionInput = z.infer<
-  typeof KeyEntityRecognitionInputSchema
->;
+export type KeyEntityRecognitionInput = z.infer<typeof KeyEntityRecognitionInputSchema>;
 
 const KeyEntitySchema = z.object({
-  type: z
-    .string()
-    .describe('The type of entity (e.g., Party, Date, Location, Monetary Amount).'),
-  value: z.string().describe('The actual text of the entity.'),
-});
+      type: z.string().describe('The type of entity (e.g., party, date, location).'),
+      value: z.string().describe('The actual text of the entity.'),
+    });
 export type KeyEntity = z.infer<typeof KeyEntitySchema>;
 
-
 const KeyEntityRecognitionOutputSchema = z.object({
-  entities: z
-      .array(KeyEntitySchema)
-      .describe('A list of key entities identified in the document.'),
+  entities: z.array(KeyEntitySchema).describe('A list of key entities identified in the document.'),
 });
-export type KeyEntityRecognitionOutput = z.infer<
-  typeof KeyEntityRecognitionOutputSchema
->;
+export type KeyEntityRecognitionOutput = z.infer<typeof KeyEntityRecognitionOutputSchema>;
 
-export async function keyEntityRecognition(
-  input: KeyEntityRecognitionInput
-): Promise<KeyEntityRecognitionOutput> {
+export async function keyEntityRecognition(input: KeyEntityRecognitionInput): Promise<KeyEntityRecognitionOutput> {
   return keyEntityRecognitionFlow(input);
 }
 
-const prompt = ai.definePrompt({
+const keyEntityRecognitionPrompt = ai.definePrompt({
   name: 'keyEntityRecognitionPrompt',
   input: {schema: KeyEntityRecognitionInputSchema},
   output: {schema: KeyEntityRecognitionOutputSchema},
-  prompt: `You are an AI assistant who specializes in analyzing legal documents.
+  prompt: `You are an AI assistant specializing in legal document analysis.
+  Your task is to identify and extract key entities from the following legal document.
+  The entities should include parties involved, dates, locations, and other relevant information.
 
-  Extract key entities from the following legal document. Key entities include parties, dates, locations, and monetary amounts.
+  Document:
+  {{{documentText}}}
 
-  Legal Document:
-  {{{legalDocumentText}}}
-
-  Please provide only the list of key entities in the structured JSON format.`,
+  Please provide the output in the structured JSON format.
+`,
 });
 
 const keyEntityRecognitionFlow = ai.defineFlow(
@@ -64,7 +55,7 @@ const keyEntityRecognitionFlow = ai.defineFlow(
     outputSchema: KeyEntityRecognitionOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
+    const {output} = await keyEntityRecognitionPrompt(input);
     return output!;
   }
 );

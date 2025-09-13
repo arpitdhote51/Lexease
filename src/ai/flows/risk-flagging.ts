@@ -2,9 +2,9 @@
 'use server';
 
 /**
- * @fileOverview A Genkit flow that flags risky clauses in a legal document.
+ * @fileOverview Implements the risk flagging flow to identify potentially risky or unusual clauses within a legal document.
  *
- * - riskFlagging - A function that takes legal document text and returns a list of risky clauses.
+ * - riskFlagging - A function that takes legal document text as input and returns identified risky clauses.
  * - RiskFlaggingInput - The input type for the riskFlagging function.
  * - RiskFlaggingOutput - The return type for the riskFlagging function.
  */
@@ -13,37 +13,36 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const RiskFlaggingInputSchema = z.object({
-  legalDocumentText: z.string().describe('The text of the legal document to analyze.'),
+  legalDocumentText: z
+    .string()
+    .describe('The legal text to analyze for potentially risky clauses.'),
 });
 export type RiskFlaggingInput = z.infer<typeof RiskFlaggingInputSchema>;
 
 const RiskFlaggingOutputSchema = z.object({
   riskyClauses: z
-      .array(z.string())
-      .describe(
-        'An array of potentially risky or unusual clauses identified in the legal text.'
-      ),
+    .array(z.string())
+    .describe('An array of potentially risky or unusual clauses identified in the legal text.'),
 });
 export type RiskFlaggingOutput = z.infer<typeof RiskFlaggingOutputSchema>;
 
-export async function riskFlagging(
-  input: RiskFlaggingInput
-): Promise<RiskFlaggingOutput> {
+export async function riskFlagging(input: RiskFlaggingInput): Promise<RiskFlaggingOutput> {
   return riskFlaggingFlow(input);
 }
 
-const prompt = ai.definePrompt({
+const riskFlaggingPrompt = ai.definePrompt({
   name: 'riskFlaggingPrompt',
   input: {schema: RiskFlaggingInputSchema},
   output: {schema: RiskFlaggingOutputSchema},
-  prompt: `You are an AI assistant who specializes in analyzing legal documents for potential risks.
+  prompt: `You are an AI legal assistant tasked with identifying potentially risky or unusual clauses in legal documents.
 
-  Identify and extract any clauses from the following legal document that appear risky, unusual, or potentially problematic.
+  Analyze the following legal text and identify any clauses that could be problematic, unusual, or create a potential risk for the user. Provide a list of the risky clauses.
 
-  Legal Document:
+  Legal Text:
   {{{legalDocumentText}}}
 
-  Please provide only the list of risky clauses in the structured JSON format.`,
+  Return only a list of the potentially risky clauses in the structured JSON format.
+  `,
 });
 
 const riskFlaggingFlow = ai.defineFlow(
@@ -53,7 +52,7 @@ const riskFlaggingFlow = ai.defineFlow(
     outputSchema: RiskFlaggingOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
+    const {output} = await riskFlaggingPrompt(input);
     return output!;
   }
 );
