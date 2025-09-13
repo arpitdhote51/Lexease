@@ -131,16 +131,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
                     const text = e.target?.result as string;
                     resolve(text);
                 } else {
-                     // For PDF and images, we will send the data URI to the AI
-                     const dataUri = e.target?.result as string;
-                     // For now, we will just resolve with a placeholder as the AI will handle it.
-                     // In a full implementation, you might call a specific text extraction flow here.
-                     // However, based on the new logic, we just need the text.
-                     // This part of the code seems to have a logical inconsistency if we rely on server-side extraction.
-                     // Let's assume for now, we pass the extracted text to the flows.
-                     // The prompt suggests we have text, so we'll simulate that for non-DOCX files.
-                     console.warn(`File type ${file.type} not fully supported for local text extraction. Using placeholder.`);
-                     resolve(`[Content of ${file.name}]`);
+                   reject(new Error("Unsupported file type. Please upload a .docx or .txt file."));
                 }
             } catch (error) {
                 reject(error);
@@ -155,16 +146,14 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
             reader.readAsText(file);
         }
         else {
-            // For PDF/Images, we'll read as data URL, though the text extraction part is complex client-side.
-            // Let's stick to the flow of getting some text first.
-            reader.readAsDataURL(file);
+            reject(new Error("Unsupported file type. Please upload a .docx or .txt file."));
         }
     });
 };
 
   const handleFileError = (error: any, type: string) => {
     console.error(`File processing error (${type}):`, error);
-    toast({ variant: 'destructive', title: `Error Processing ${type} File`, description: 'There was an error processing your file.' });
+    toast({ variant: 'destructive', title: `Error Processing File`, description: error.message || 'There was an error processing your file.' });
     setFile(null);
     setIsProcessing(false);
     setIsAnalyzing(false);
@@ -283,7 +272,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
                     type="file"
                     className="sr-only"
                     onChange={handleFileChange}
-                    accept=".pdf,.docx,.txt,.png,.jpg,.jpeg"
+                    accept=".docx,.txt"
                     disabled={isLoading}
                 />
                 {isProcessing || (isAnalyzing && !documentId) ? (
@@ -304,7 +293,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
                             Drag & drop or click to upload
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                            PDF, DOCX, TXT, PNG, or JPG
+                            DOCX or TXT
                         </p>
                     </label>
                 )}
