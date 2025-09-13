@@ -48,7 +48,9 @@ export default function QAChat({ documentText, documentId }: QAChatProps) {
   }, []);
 
   useEffect(() => {
-    if (!documentId) return;
+    // With auth disabled, documentId will be 'temp-id' and we don't fetch history.
+    // If you re-enable auth, this will work for persisted documents.
+    if (!documentId || documentId === 'temp-id') return;
 
     const messagesCol = collection(db, "documents", documentId, "messages");
     const q = query(messagesCol, orderBy("timestamp", "asc"));
@@ -130,11 +132,19 @@ export default function QAChat({ documentText, documentId }: QAChatProps) {
       toast({ variant: 'destructive', title: 'Speech Recognition Error' });
     };
 
+    let finalTranscript = '';
     recognition.onresult = (event) => {
-        const transcript = Array.from(event.results).map(result => result[0]).map(result => result.transcript).join('');
-        setInput(transcript);
-        if (event.results[0].isFinal) {
-           handleSubmit(undefined, transcript);
+        let interimTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+                finalTranscript += event.results[i][0].transcript;
+            } else {
+                interimTranscript += event.results[i][0].transcript;
+            }
+        }
+        setInput(finalTranscript + interimTranscript);
+        if(finalTranscript){
+            setInput(finalTranscript);
         }
     };
     
@@ -142,29 +152,27 @@ export default function QAChat({ documentText, documentId }: QAChatProps) {
     recognitionRef.current = recognition;
   };
 
-  const handleSubmit = async (e?: React.FormEvent, voiceInput?: string) => {
+  const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    const currentInput = voiceInput || input;
+    const currentInput = input;
     if (!currentInput.trim() || isLoading) return;
 
-    const userMessage: Message = { role: "user", content: currentInput, timestamp: serverTimestamp() };
+    const userMessage: Message = { role: "user", content: currentInput };
+    setMessages(prev => [...prev, userMessage]);
     
     setInput("");
     setIsLoading(true);
 
     try {
-        const messagesCol = collection(db, "documents", documentId, "messages");
-        await addDoc(messagesCol, userMessage);
-        
         const qaInput: InteractiveQAInput = { documentText, question: currentInput };
         const result = await interactiveQA(qaInput);
-        const assistantMessage: Message = { role: "assistant", content: result.answer, timestamp: serverTimestamp() };
+        const assistantMessage: Message = { role: "assistant", content: result.answer };
+        setMessages(prev => [...prev, assistantMessage]);
 
-        await addDoc(messagesCol, assistantMessage);
     } catch (error) {
         console.error("Q&A failed:", error);
         toast({ variant: "destructive", title: "Error", description: "Could not get an answer. Please try again." });
-        setMessages(prev => prev.filter(msg => msg.content !== userMessage.content || msg.role !== 'user' ));
+        setMessages(prev => prev.slice(0, -1)); // Remove user message on error
     } finally {
         setIsLoading(false);
     }
@@ -178,9 +186,9 @@ export default function QAChat({ documentText, documentId }: QAChatProps) {
       <CardContent className="flex-1 flex flex-col gap-4">
         <ScrollArea className="flex-1 pr-4 -mr-4" ref={scrollAreaRef}>
           <div className="space-y-4">
-            {messages.map((message) => (
+            {messages.map((message, index) => (
               <div
-                key={message.id}
+                key={message.id || `msg-${index}`}
                 className={`flex items-start gap-3 ${
                   message.role === "user" ? "justify-end" : ""
                 }`}
@@ -203,10 +211,10 @@ export default function QAChat({ documentText, documentId }: QAChatProps) {
                         variant="ghost"
                         size="icon"
                         className="absolute -bottom-2 -right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => handlePlayAudio(message.content, message.id!)}
+                        onClick={() => handlePlayAudio(message.content, message.id || `msg-audio-${index}`)}
                         disabled={audioLoading !== null}
                     >
-                       {audioLoading === message.id ? <Loader2 className="animate-spin" /> : <Volume2 size={16} />}
+                       {audioLoading === (message.id || `msg-audio-${index}`) ? <Loader2 className="animate-spin" /> : <Volume2 size={16} />}
                     </Button>
                    )}
                 </div>
