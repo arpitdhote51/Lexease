@@ -1,3 +1,4 @@
+import "@/app/globals.css";
 import { AuthProvider } from "@/hooks/use-auth";
 import { Toaster } from "@/components/ui/toaster";
 import { type ReactNode } from "react";
