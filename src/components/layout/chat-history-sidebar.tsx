@@ -22,9 +22,12 @@ export default function ChatHistorySidebar() {
   const handleNewAnalysis = () => {
     router.push("/new");
   };
+  
+  const handleNewDraft = () => {
+    router.push("/draft");
+  };
 
   const navLinks = [
-    { href: "/new", icon: "upload_file", label: "New Analysis" },
     { href: "/consult", icon: "groups", label: "Consult a Lawyer" },
     { href: "/learn", icon: "school", label: "Learn Law" },
     { href: "/about", icon: "info", label: "About Us" },
@@ -39,10 +42,14 @@ export default function ChatHistorySidebar() {
         </Link>
       </div>
 
-      <div className="p-4">
+      <div className="p-4 space-y-2">
         <Button onClick={handleNewAnalysis} className="w-full bg-accent text-white font-semibold rounded-lg hover:bg-accent/90">
             <span className="material-symbols-outlined mr-2">add</span>
             New Analysis
+        </Button>
+         <Button onClick={handleNewDraft} variant="outline" className="w-full font-semibold rounded-lg">
+            <span className="material-symbols-outlined mr-2">edit_document</span>
+            New Draft
         </Button>
       </div>
       
