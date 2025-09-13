@@ -154,6 +154,7 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
         // 1. Extract Text
         const { documentText } = await extractTextFromDocument({ documentDataUri: dataUri });
         await updateDoc(doc(db, "documents", newId), { documentText });
+        setDocumentText(documentText);
 
         toast({ title: "Analysis Started", description: "Your document analysis is running. Results will appear here shortly." });
         
@@ -169,9 +170,9 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
     }
   };
 
-  const runSummarization = async (docId: string, documentText: string, role: UserRole) => {
+  const runSummarization = async (docId: string, docText: string, role: UserRole) => {
     try {
-      const result = await plainLanguageSummarization({ documentText, userRole: role });
+      const result = await plainLanguageSummarization({ documentText: docText, userRole: role });
       await updateDoc(doc(db, "documents", docId), { "analysis.summary": result });
     } catch (e) {
       console.error("Summarization failed", e);
@@ -179,9 +180,9 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
     }
   };
 
-  const runEntityRecognition = async (docId: string, documentText: string) => {
+  const runEntityRecognition = async (docId: string, docText: string) => {
     try {
-      const result = await keyEntityRecognition({ documentText });
+      const result = await keyEntityRecognition({ documentText: docText });
       await updateDoc(doc(db, "documents", docId), { "analysis.entities": result });
     } catch (e) {
       console.error("Entity Recognition failed", e);
@@ -189,9 +190,9 @@ export default function LexeaseApp({ existingDocument: initialDocument }: Lexeas
     }
   };
 
-  const runRiskFlagging = async (docId: string, documentText: string) => {
+  const runRiskFlagging = async (docId: string, docText: string) => {
     try {
-      const result = await riskFlagging({ documentText });
+      const result = await riskFlagging({ documentText: docText });
       await updateDoc(doc(db, "documents", docId), { "analysis.risks": result });
     } catch (e) {
       console.error("Risk Flagging failed", e);

@@ -17,40 +17,14 @@ export default function ChatHistorySidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const [documents, setDocuments] = useState<DocumentData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    if (!user) return;
-    const fetchDocuments = async () => {
-      setIsLoading(true);
-      try {
-        const q = query(
-          collection(db, "documents"),
-          where("userId", "==", user.uid),
-          orderBy("createdAt", "desc")
-        );
-        const querySnapshot = await getDocs(q);
-        const docs = querySnapshot.docs.map(
-          (doc) => ({ id: doc.id, ...doc.data() } as DocumentData)
-        );
-        setDocuments(docs);
-      } catch (error) {
-        console.error("Error fetching documents for sidebar: ", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchDocuments();
-  }, [user]);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleNewAnalysis = () => {
     router.push("/new");
   };
 
   const navLinks = [
-    { href: "/", icon: "dashboard", label: "Dashboard" },
-    { href: "/documents", icon: "folder_open", label: "All Documents" },
+    { href: "/new", icon: "upload_file", label: "New Analysis" },
     { href: "/consult", icon: "groups", label: "Consult a Lawyer" },
     { href: "/learn", icon: "school", label: "Learn Law" },
     { href: "/about", icon: "info", label: "About Us" },
@@ -80,27 +54,6 @@ export default function ChatHistorySidebar() {
                   <span>{link.label}</span>
               </Link>
             ))}
-
-            <Separator className="my-4" />
-
-            <h3 className="px-4 text-xs font-semibold text-muted-foreground tracking-wider uppercase">My Analyses</h3>
-
-            {isLoading ? (
-                <div className="space-y-2 px-4 mt-2">
-                    <Skeleton className="h-6 w-full" />
-                    <Skeleton className="h-6 w-full" />
-                    <Skeleton className="h-6 w-5/6" />
-                </div>
-            ) : documents.length > 0 ? (
-                documents.map(doc => (
-                    <Link key={doc.id} href={`/${doc.id}`} className={`flex items-center gap-3 px-4 py-2.5 rounded-md font-medium text-sm truncate ${pathname === `/${doc.id}` ? 'bg-background text-accent' : 'text-muted-foreground hover:bg-background hover:text-foreground'}`}>
-                        <span className="material-symbols-outlined text-base">description</span>
-                        <span className="truncate">{doc.fileName}</span>
-                    </Link>
-                ))
-            ) : (
-                <p className="px-4 text-sm text-center text-muted-foreground mt-4">No documents analyzed yet.</p>
-            )}
         </nav>
       </ScrollArea>
     </aside>
