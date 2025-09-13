@@ -10,7 +10,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { templates } from '@/app/data/draft-templates.json';
+import { Storage } from '@google-cloud/storage';
 
 const DraftDocumentInputSchema = z.object({
   documentType: z.string().describe('The type of legal document to draft (e.g., "Simple Affidavit").'),
@@ -24,11 +24,11 @@ const DraftDocumentOutputSchema = z.object({
 });
 export type DraftDocumentOutput = z.infer<typeof DraftDocumentOutputSchema>;
 
-// Tool to find relevant legal templates
+// Tool to find relevant legal templates from Google Cloud Storage
 const findRelevantTemplates = ai.defineTool(
     {
       name: 'findRelevantTemplates',
-      description: 'Searches for and retrieves the most relevant legal template based on the document type.',
+      description: 'Searches for and retrieves the most relevant legal template from Google Cloud Storage.',
       inputSchema: z.object({
         documentType: z.string().describe('The type of document to search for (e.g., "Simple Affidavit", "Mutual NDA").'),
         language: z.string().describe('The language of the template required.'),
@@ -38,22 +38,33 @@ const findRelevantTemplates = ai.defineTool(
       }),
     },
     async ({ documentType, language }) => {
-      console.log(`Searching for template: ${documentType} in ${language}`);
-      const templateData = templates.find(t => t.documentType === documentType);
-      if (!templateData) {
-        throw new Error(`Template for document type "${documentType}" not found.`);
+      console.log(`Searching GCS for template: ${documentType} in ${language}`);
+      const storage = new Storage();
+      const bucketName = 'legal_drafts';
+
+      // Assumes file naming convention like "Simple_Affidavit.txt" and folder structure like "English/"
+      const fileName = `${documentType.replace(/ /g, '_')}.txt`;
+      const filePath = `${language}/${fileName}`;
+
+      try {
+        const bucket = storage.bucket(bucketName);
+        const file = bucket.file(filePath);
+        const [exists] = await file.exists();
+        if (!exists) {
+            throw new Error(`Template file not found at path: ${filePath}`);
+        }
+        const contents = await file.download();
+        const template = contents.toString();
+        return { template };
+
+      } catch (error) {
+        console.error(`Failed to read from GCS bucket "${bucketName}":`, error);
+        throw new Error(`Could not retrieve template for "${documentType}" in ${language}.`);
       }
-  
-      const template = templateData.languages[language as keyof typeof templateData.languages] || templateData.languages.English;
-      if (!template) {
-        throw new Error(`Template for language "${language}" not found for document type "${documentType}".`);
-      }
-      
-      return { template };
     }
 );
 
-// New agentic prompt that uses the tool
+// Agentic prompt that uses the tool
 const draftingAgentPrompt = ai.definePrompt({
     name: 'draftingAgentPrompt',
     tools: [findRelevantTemplates],
