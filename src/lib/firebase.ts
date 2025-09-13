@@ -1,6 +1,6 @@
-import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
-import { getAuth, Auth } from "firebase/auth";
-import { initializeFirestore, persistentLocalCache, Firestore, memoryLocalCache } from "firebase/firestore";
+import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
+import { getAuth, type Auth } from "firebase/auth";
+import { initializeFirestore, persistentLocalCache, type Firestore } from "firebase/firestore";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDcFJTJnGLI-uVStqI8uuQVcQMY34ilMJg",
@@ -12,31 +12,26 @@ const firebaseConfig = {
     measurementId: ""
 };
 
-// Singleton instances
-let app: FirebaseApp | undefined;
-let auth: Auth | undefined;
-let db: Firestore | undefined;
+let app: FirebaseApp;
+let auth: Auth;
+let db: Firestore;
 
-function initializeFirebase() {
-  if (typeof window !== 'undefined') {
+// Initialize Firebase on the client side
+if (typeof window !== 'undefined') {
     if (!getApps().length) {
-      app = initializeApp(firebaseConfig);
-      auth = getAuth(app);
-      db = initializeFirestore(app, {
-        localCache: persistentLocalCache({})
-      });
+        app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = initializeFirestore(app, {
+            localCache: persistentLocalCache({})
+        });
     } else {
-      app = getApp();
-      auth = getAuth(app);
-      db = initializeFirestore(app, {
-        localCache: memoryLocalCache({})
-      });
+        app = getApp();
+        auth = getAuth(app);
+        db = initializeFirestore(app, {
+            localCache: persistentLocalCache({})
+        });
     }
-  }
 }
 
-// Initialize on script load
-initializeFirebase();
-
-// Export the instances. They can be undefined on the server-side.
+// Export the initialized instances
 export { app, auth, db };
