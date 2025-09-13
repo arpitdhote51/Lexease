@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Textarea } from "./ui/textarea";
 import { Loader2, RefreshCw } from "lucide-react";
 import { draftDocument } from "@/ai/flows/draft-document";
-import { listTemplates } from "@/ai/flows/list-templates";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "./ui/skeleton";
 
@@ -18,30 +17,9 @@ export default function DraftingAgent() {
   const [userInputs, setUserInputs] = useState("");
   const [generatedDraft, setGeneratedDraft] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isFetchingTemplates, setIsFetchingTemplates] = useState(true);
-  const [templates, setTemplates] = useState<string[]>([]);
   const { toast } = useToast();
 
-  const fetchTemplates = async () => {
-    setIsFetchingTemplates(true);
-    try {
-        const result = await listTemplates();
-        setTemplates(result.templates);
-    } catch (error) {
-        console.error("Failed to fetch templates:", error);
-        toast({
-            variant: "destructive",
-            title: "Failed to load templates",
-            description: "Could not retrieve document templates from the library.",
-        });
-    } finally {
-        setIsFetchingTemplates(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchTemplates();
-  }, []);
+  const templates = ["Agreement", "Bail", "Affidavit"];
 
   const handleDraft = async () => {
     if (!documentType || !userInputs) {
@@ -104,18 +82,15 @@ export default function DraftingAgent() {
                             <div className="space-y-2">
                                 <Label htmlFor="document-type" className="flex items-center justify-between">
                                     Document Type
-                                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={fetchTemplates} disabled={isFetchingTemplates}>
-                                        <RefreshCw className={`h-4 w-4 ${isFetchingTemplates ? 'animate-spin' : ''}`} />
-                                    </Button>
                                 </Label>
-                                <Select onValueChange={setDocumentType} value={documentType} disabled={isFetchingTemplates || templates.length === 0}>
+                                <Select onValueChange={setDocumentType} value={documentType}>
                                     <SelectTrigger id="document-type">
-                                        <SelectValue placeholder={isFetchingTemplates ? "Loading templates..." : "Select a document..."} />
+                                        <SelectValue placeholder="Select a document..." />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {templates.map(template => (
                                             <SelectItem key={template} value={template}>
-                                                {template.replace(/\.(docx|pdf|txt)$/i, '')}
+                                                {template}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
